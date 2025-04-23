@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { toast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 const formSchema = z.object({
   email: z.string().email({
@@ -30,6 +30,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const { toast } = useToast()
   
   // 获取回调URL
   const callbackUrl = searchParams?.get("callbackUrl") || "/home"
@@ -42,7 +43,7 @@ export default function LoginPage() {
         duration: 5000,
       })
     }
-  }, [searchParams])
+  }, [searchParams, toast])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

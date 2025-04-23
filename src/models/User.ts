@@ -22,9 +22,6 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-// 确保email字段有正确的唯一索引
-userSchema.index({ email: 1 }, { unique: true });
-
 // 在模型编译之前初始化集合
 if (mongoose.connection.readyState === 1) {
   initializeUserCollection();
