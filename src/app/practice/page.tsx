@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
-import { CheckCircle2, Target, BookOpen, History, Star, TrendingUp, Database, Code, Network, Server, Globe, Loader2 } from 'lucide-react';
+import { CheckCircle2, Target, BookOpen, History, Star, TrendingUp, Database, Code, Network, Server, Globe, Loader2, Sparkles, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import Link from 'next/link';
 
 interface Category {
   name: string;
@@ -23,6 +24,7 @@ export default function Practice() {
   const [error, setError] = useState('');
   const [recentPractices, setRecentPractices] = useState<any[]>([]);
   const [mistakeCount, setMistakeCount] = useState(0);
+  const [customLibraries, setCustomLibraries] = useState<any[]>([]);
   
   // 获取当前用户ID - 如果已登录则使用实际ID，否则使用默认ID
   const getUserId = () => {
@@ -48,6 +50,7 @@ export default function Practice() {
   useEffect(() => {
     fetchRecentPractices();
     fetchMistakeCount();
+    fetchCustomLibraries();
   }, [session]); // 添加session依赖，确保登录状态变化时重新获取数据
   
   // 获取最近练习记录
@@ -112,6 +115,40 @@ export default function Practice() {
       }
     } catch (error) {
       console.error('获取错题数量失败:', error);
+    }
+  };
+
+  // 获取用户自定义题库
+  const fetchCustomLibraries = async () => {
+    try {
+      const userId = getUserId();
+      const response = await fetch(`/api/questions/library?limit=100`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        // 按科目分组题目
+        const subjectGroups: Record<string, any[]> = {};
+        
+        if (data && data.questions && Array.isArray(data.questions)) {
+          data.questions.forEach((question: any) => {
+            if (!subjectGroups[question.subject]) {
+              subjectGroups[question.subject] = [];
+            }
+            subjectGroups[question.subject].push(question);
+          });
+          
+          // 转换为数组格式
+          const libraries = Object.entries(subjectGroups).map(([subject, questions]) => ({
+            name: subject,
+            count: questions.length,
+            id: subject.toLowerCase().replace(/\s+/g, '-')
+          }));
+          
+          setCustomLibraries(libraries);
+        }
+      }
+    } catch (error) {
+      console.error('获取自定义题库失败:', error);
     }
   };
   
@@ -310,14 +347,15 @@ export default function Practice() {
             </Card>
           </div>
 
-          {/* 题目分类区域 */}
+          {/* 专业题库区域 */}
           <div className="mb-8">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <BookOpen className="w-5 h-5 mr-2" />
-                  题目分类
+                  专业题库
                 </CardTitle>
+                <CardDescription>按学科分类的专业题目，由专业教师精心编写</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -336,6 +374,55 @@ export default function Practice() {
                       <p className="text-xs text-gray-500">{category.description}</p>
                     </Button>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 自定义题库区域 */}
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Database className="w-5 h-5 mr-2" />
+                  自定义题库
+                </CardTitle>
+                <CardDescription>您创建的个人题库，包含AI生成和自定义导入的题目</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {customLibraries.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {customLibraries.map((library) => (
+                      <Button 
+                        key={library.id}
+                        variant="outline" 
+                        className="flex-col h-auto p-4 justify-start items-start text-left"
+                        onClick={() => createCategoryPractice(library.name)}
+                        disabled={loading}
+                      >
+                        <div className="flex items-center w-full mb-2">
+                          <Database className="w-4 h-4 mr-2" />
+                          <span className="font-medium">{library.name}</span>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          包含 {library.count} 个题目
+                        </p>
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 border rounded-lg border-dashed">
+                    <p className="text-gray-500 mb-4">您还没有自定义题库</p>
+                  </div>
+                )}
+
+                <div className="mt-6 flex justify-center">
+                  <Link href="/practice/generator">
+                    <Button className="bg-gradient-to-r from-amber-500 to-orange-600">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      AI智能导题
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
