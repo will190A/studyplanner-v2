@@ -1,0 +1,124 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import connect from '@/lib/db';
+import Question from '@/models/Question';
+import Mistake from '@/models/Mistake';
+
+export async function POST(request: Request) {
+  try {
+    let userId;
+    const data = await request.json();
+    const { questionId, userAnswer, userId: requestUserId } = data;
+    
+    // 检查请求中是否包含userId
+    if (requestUserId) {
+      userId = requestUserId;
+    } else {
+      // 如果没有提供userId，则检查用户是否已登录
+      const session = await getServerSession(authOptions);
+      if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      userId = session.user.id;
+    }
+    
+    if (!questionId || userAnswer === undefined) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+    
+    await connect();
+    
+    // 获取题目
+    const question = await Question.findById(questionId);
+    
+    if (!question) {
+      return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+    }
+    
+    // 记录调试信息
+    console.log('问题ID:', questionId);
+    console.log('问题类型:', question.type);
+    console.log('正确答案:', question.answer);
+    console.log('用户答案:', userAnswer);
+    console.log('正确答案类型:', typeof question.answer);
+    console.log('用户答案类型:', typeof userAnswer);
+    
+    // 检查答案是否正确
+    let isCorrect = false;
+    
+    if (Array.isArray(question.answer)) {
+      // 多选题
+      console.log('多选题答案验证');
+      if (Array.isArray(userAnswer)) {
+        // 排序两个数组，确保顺序不同但内容相同的答案也能被判定为正确
+        const sortedCorrectAnswer = [...question.answer].sort();
+        const sortedUserAnswer = [...userAnswer].sort();
+        
+        console.log('排序后正确答案:', sortedCorrectAnswer);
+        console.log('排序后用户答案:', sortedUserAnswer);
+        
+        // 检查长度是否相同
+        if (sortedCorrectAnswer.length === sortedUserAnswer.length) {
+          // 检查每个元素是否相同
+          isCorrect = sortedCorrectAnswer.every((ans, index) => ans === sortedUserAnswer[index]);
+          console.log('数组长度相同，逐个比较结果:', isCorrect);
+        }
+      }
+    } else {
+      // 单选题、判断题、填空题或编程题
+      console.log('单选/判断/填空题答案验证');
+      isCorrect = question.answer === userAnswer;
+      console.log('严格比较结果:', isCorrect);
+      
+      // 如果不相等，尝试更宽松的比较
+      if (!isCorrect) {
+        console.log('严格比较不相等，尝试更宽松比较');
+        const trimmedCorrect = String(question.answer).trim();
+        const trimmedUser = String(userAnswer).trim();
+        console.log('修剪后正确答案:', trimmedCorrect);
+        console.log('修剪后用户答案:', trimmedUser);
+        isCorrect = trimmedCorrect === trimmedUser;
+        console.log('宽松比较结果:', isCorrect);
+      }
+    }
+    
+    console.log('最终是否正确:', isCorrect);
+    
+    // 如果答案不正确，记录错题
+    if (!isCorrect) {
+      const existingMistake = await Mistake.findOne({ 
+        userId, 
+        questionId: question._id 
+      });
+      
+      if (existingMistake) {
+        // 更新已有错题记录
+        existingMistake.wrongCount += 1;
+        existingMistake.lastWrongDate = new Date();
+        existingMistake.wrongAnswer = userAnswer;
+        existingMistake.status = 'unresolved';
+        await existingMistake.save();
+      } else {
+        // 创建新的错题记录
+        const mistake = new Mistake({
+          userId,
+          questionId: question._id,
+          category: question.category,
+          wrongAnswer: userAnswer,
+          status: 'unresolved'
+        });
+        await mistake.save();
+      }
+    }
+    
+    return NextResponse.json({
+      isCorrect,
+      correctAnswer: isCorrect ? null : question.answer,
+      explanation: question.explanation // 无论正确与否都返回解释
+    });
+  } catch (error) {
+    console.error('Error verifying answer:', error);
+    return NextResponse.json({ error: 'Failed to verify answer' }, { status: 500 });
+  }
+} 
