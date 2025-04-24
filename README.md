@@ -1,3 +1,4 @@
+
 # StudyPlanner - 智能学习助手
 
 StudyPlanner 是一个现代化的学习管理系统，旨在帮助学生更好地规划学习、追踪进度并提高学习效率。通过智能的学习计划管理和练习系统，让学习变得更有条理和效果。
@@ -47,42 +48,61 @@ StudyPlanner 是一个现代化的学习管理系统，旨在帮助学生更好�
 ### 安装步骤
 
 1. 克隆项目
-```bash
-git clone https://github.com/yourusername/StudyPlanner.git
-cd StudyPlanner
-```
 
-2. 安装依赖
-```bash
-npm install
-# 或者使用 yarn
-yarn install
-```
+   ```bash
+   git clone https://github.com/yourusername/StudyPlanner.git
+   cd StudyPlanner
+   ```
+
+2. 连接到阿里云服务器，安装 Node.js 、 NPM 、 MongoDB
+
+   ```bash
+   # 获取服务器的公网 IP 地址 和 SSH 密钥，使用 SSH 连接到服务器：
+   ssh -i /path/to/your/private-key.pem root@<your-server-ip>
+
+   # 安装 Node.js 、 NPM:
+   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+   source ~/.bashrc
+   nvm install 16
+   nvm use 16
+
+   # 安装并启动 MongoDB:
+   sudo yum install -y mongodb-org
+   sudo systemctl start mongod
+   sudo systemctl enable mongod
+   sudo systemctl status mongod  # 验证 MongoDB 是否正常运行
+   ```
 
 3. 配置环境变量
-创建 `.env.local` 文件，添加必要的环境变量：
-```env
-MONGODB_URI=你的MongoDB连接字符串
-NEXTAUTH_SECRET=你的NextAuth密钥
-NEXTAUTH_URL=http://localhost:3000
-```
 
-4. 初始化数据库
-```bash
-npm run db:init
-# 或者使用 yarn
-yarn db:init
-```
+   创建 `.env.local` 文件，添加必要的环境变量：
 
-5. 启动开发服务器
-```bash
-npm run dev
-# 或者使用 yarn
-yarn dev
-```
+   ```env
+   MONGODB_URI=你的MongoDB连接字符串
+   NEXTAUTH_SECRET=你的NextAuth密钥
+   NEXTAUTH_URL=http://localhost:3000
+   ```
 
-6. 访问应用
-打开浏览器访问 http://localhost:3000
+4. 安装依赖
+
+   ```bash
+   npm install
+   ```
+
+5. 构建 Next.js 项目并启动
+
+   ```bash
+   npm run build
+   npm run start
+   ```
+
+6. 配置防火墙和安全组
+
+   开放必要端口：确保 3000 端口（默认用于 Next.js）和 27017 端口（MongoDB）在服务器的安全组中开放。
+
+7. 访问应用
+
+   打开浏览器访问 `http://<your-server-ip>:3000`
 
 ## 📁 项目结构
 
@@ -91,12 +111,12 @@ StudyPlanner/
 ├── src/
 │   ├── app/              # 页面组件
 │   ├── components/       # 可复用组件
-│   ├── lib/             # 工具函数和配置
-│   ├── models/          # 数据模型
-│   └── styles/          # 样式文件
-├── public/              # 静态资源
-├── prisma/             # 数据库模式
-└── package.json        # 项目配置
+│   ├── lib/              # 工具函数和配置
+│   ├── models/           # 数据模型
+│   └── styles/           # 样式文件
+├── public/               # 静态资源
+├── prisma/               # 数据库模式
+└── package.json          # 项目配置
 ```
 
 ## ❗ 常见问题
@@ -133,4 +153,4 @@ StudyPlanner/
 - React
 - Tailwind CSS
 - MongoDB
-- NextAuth.js 
+- NextAuth.js
