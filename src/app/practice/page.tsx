@@ -39,6 +39,7 @@ export default function Practice() {
   const [mistakeCount, setMistakeCount] = useState(0);
   const [customLibraries, setCustomLibraries] = useState<any[]>([]);
   const [deletingLibrary, setDeletingLibrary] = useState<string | null>(null);
+  const [questionCount, setQuestionCount] = useState(10); // 默认10题
   
   // 获取当前用户ID - 如果已登录则使用实际ID，否则使用默认ID
   const getUserId = () => {
@@ -184,9 +185,9 @@ export default function Practice() {
         body: JSON.stringify({
           type: 'category',
           category,
-          count: 5, // 每次练习5题
-          userId, // 使用当前用户ID
-          isCustom // 标记是否是自定义题库
+          count: questionCount, // 使用用户选择的题目数量
+          userId,
+          isCustom
         })
       });
       
@@ -588,6 +589,31 @@ export default function Practice() {
                 暂无练习记录
               </div>
             )}
+          </div>
+          
+          {/* 题目数量选择器 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold mb-4">练习设置</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    每次练习题目数量
+                  </label>
+                  <select
+                    value={questionCount}
+                    onChange={(e) => setQuestionCount(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value={5}>5题</option>
+                    <option value={10}>10题</option>
+                    <option value={15}>15题</option>
+                    <option value={20}>20题</option>
+                    <option value={25}>25题</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </main>

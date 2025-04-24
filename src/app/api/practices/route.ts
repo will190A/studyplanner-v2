@@ -127,14 +127,22 @@ export async function POST(request: Request) {
           const customQuestions = await CustomQuestion.find({ 
             userId, 
             subject: category 
-          }).limit(count).lean();
+          }).lean();
           
           if (customQuestions.length === 0) {
             return NextResponse.json({ error: '未找到相关题目，请先添加题目到该题库' }, { status: 404 });
           }
           
+          // 如果题库中的题目数量少于请求的数量，使用实际题目数量
+          const actualCount = Math.min(customQuestions.length, count);
+          
+          // 随机选择题目
+          const selectedQuestions = customQuestions
+            .sort(() => Math.random() - 0.5)
+            .slice(0, actualCount);
+          
           // 转换自定义题目为标准格式
-          questions = customQuestions.map(q => ({
+          questions = selectedQuestions.map(q => ({
             _id: q._id,
             title: q.subject,
             content: q.content,
