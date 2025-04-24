@@ -58,10 +58,8 @@ type GeneratorFormValues = z.infer<typeof generatorFormSchema>;
 // 问题类型选项
 const questionTypeOptions = [
   { id: 'multiple_choice', name: '单选题' },
-  { id: 'multiple_answer', name: '多选题' },
   { id: 'fill_blank', name: '填空题' },
   { id: 'short_answer', name: '简答题' },
-  { id: 'true_false', name: '判断题' },
 ];
 
 // 题目数量选项
