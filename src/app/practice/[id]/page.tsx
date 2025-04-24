@@ -57,6 +57,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   const [correctAnswers, setCorrectAnswers] = useState<Record<string, string | string[]>>({})
   const [explanations, setExplanations] = useState<Record<string, string>>({})
   const [questionResults, setQuestionResults] = useState<Record<string, boolean>>({})
+  const [selfJudgments, setSelfJudgments] = useState<Record<string, boolean>>({})
   
   // 开始计时器
   const [startTime] = useState(new Date())
@@ -378,6 +379,18 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     return (correctCount / questions.length) * 100
   }
   
+  // 处理自我判断
+  const handleSelfJudge = (questionId: string, judgment: boolean) => {
+    setSelfJudgments(prev => ({
+      ...prev,
+      [questionId]: judgment
+    }))
+    setQuestionResults(prev => ({
+      ...prev,
+      [questionId]: judgment
+    }))
+  }
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -500,6 +513,8 @@ export default function PracticePage({ params }: { params: { id: string } }) {
               correctAnswer={correctAnswers[currentQuestion._id]}
               explanation={explanations[currentQuestion._id]}
               disabled={isCompleted}
+              onSelfJudge={handleSelfJudge}
+              selfJudged={selfJudgments[currentQuestion._id]}
             />
           )}
           

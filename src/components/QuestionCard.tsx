@@ -18,7 +18,7 @@ interface QuestionProps {
   id: string
   title: string
   content: string
-  type: 'choice' | 'multiple' | 'judge' | 'fill' | 'code'
+  type: 'choice' | 'multiple' | 'judge' | 'fill' | 'code' | 'short_answer'
   options?: QuestionOption[]
   onAnswer: (questionId: string, answer: string | string[]) => void
   userAnswer?: string | string[]
@@ -27,6 +27,8 @@ interface QuestionProps {
   correctAnswer?: string | string[]
   explanation?: string
   disabled?: boolean
+  onSelfJudge?: (questionId: string, judgment: boolean) => void
+  selfJudged?: boolean
 }
 
 export default function QuestionCard({
@@ -41,7 +43,9 @@ export default function QuestionCard({
   isCorrect,
   correctAnswer,
   explanation,
-  disabled = false
+  disabled = false,
+  onSelfJudge,
+  selfJudged
 }: QuestionProps) {
   const [answer, setAnswer] = useState<string | string[]>(userAnswer || (type === 'multiple' ? [] : ''))
   
@@ -71,6 +75,12 @@ export default function QuestionCard({
     setAnswer(value)
     onAnswer(id, value)
   }
+
+  const handleSelfJudge = (judgment: boolean) => {
+    if (onSelfJudge) {
+      onSelfJudge(id, judgment)
+    }
+  }
   
   return (
     <Card className="mb-6">
@@ -82,9 +92,10 @@ export default function QuestionCard({
             {type === 'judge' && <span className="badge bg-green-100 text-green-800 text-xs py-1 px-2 rounded-full mr-2">判断题</span>}
             {type === 'fill' && <span className="badge bg-orange-100 text-orange-800 text-xs py-1 px-2 rounded-full mr-2">填空题</span>}
             {type === 'code' && <span className="badge bg-gray-100 text-gray-800 text-xs py-1 px-2 rounded-full mr-2">编程题</span>}
+            {type === 'short_answer' && <span className="badge bg-gray-100 text-gray-800 text-xs py-1 px-2 rounded-full mr-2">简答题</span>}
             {title}
           </div>
-          {isRevealed && (
+          {isRevealed && type !== 'short_answer' && (
             isCorrect ? (
               <span className="flex items-center text-green-600">
                 <CheckCircle className="h-5 w-5 mr-1" />
@@ -211,11 +222,15 @@ export default function QuestionCard({
             </RadioGroup>
           )}
           
-          {(type === 'fill' || type === 'code') && (
+          {(type === 'fill' || type === 'code' || type === 'short_answer') && (
             <Textarea
               value={answer as string}
               onChange={(e) => handleTextAnswer(e.target.value)}
-              placeholder={type === 'fill' ? "请输入答案" : "请编写代码"}
+              placeholder={
+                type === 'fill' ? "请输入答案" : 
+                type === 'code' ? "请编写代码" : 
+                "请输入简答题答案"
+              }
               className="min-h-[100px]"
               disabled={disabled}
             />
@@ -226,6 +241,29 @@ export default function QuestionCard({
             <div className="mt-4 p-4 bg-blue-50 rounded-md">
               <h4 className="font-semibold text-blue-900 select-none">答案解析：</h4>
               <div className="text-blue-800 mt-1 whitespace-pre-line select-none">{explanation}</div>
+            </div>
+          )}
+
+          {/* 简答题自我判断 */}
+          {type === 'short_answer' && isRevealed && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-md">
+              <h4 className="font-semibold text-gray-900 select-none mb-2">自我判断：</h4>
+              <div className="flex space-x-4">
+                <Button
+                  variant={selfJudged === true ? "default" : "outline"}
+                  className={`${selfJudged === true ? "bg-green-500 hover:bg-green-600" : ""}`}
+                  onClick={() => handleSelfJudge(true)}
+                >
+                  答对了
+                </Button>
+                <Button
+                  variant={selfJudged === false ? "default" : "outline"}
+                  className={`${selfJudged === false ? "bg-red-500 hover:bg-red-600" : ""}`}
+                  onClick={() => handleSelfJudge(false)}
+                >
+                  答错了
+                </Button>
+              </div>
             </div>
           )}
         </div>

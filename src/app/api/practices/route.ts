@@ -146,7 +146,7 @@ export async function POST(request: Request) {
             _id: q._id,
             title: q.subject,
             content: q.content,
-            type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
+            type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
             options: q.options ? q.options.map((opt, index) => ({
               label: String.fromCharCode(65 + index), // A, B, C...
               text: opt

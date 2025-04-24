@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
-import { CheckCircle2, Target, BookOpen, History, Star, TrendingUp, Database, Code, Network, Server, Globe, Loader2, Sparkles, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, Target, BookOpen, History, Star, TrendingUp, Database, Code, Network, Server, Globe, Loader2, Sparkles, Plus, Trash2, AlertTriangle, Calendar, RotateCcw, Shuffle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -40,6 +40,10 @@ export default function Practice() {
   const [customLibraries, setCustomLibraries] = useState<any[]>([]);
   const [deletingLibrary, setDeletingLibrary] = useState<string | null>(null);
   const [questionCount, setQuestionCount] = useState(10); // 默认10题
+  const [practiceType, setPracticeType] = useState('daily');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [difficulty, setDifficulty] = useState('easy');
+  const [questionTypes, setQuestionTypes] = useState(['choice', 'multiple', 'judge', 'fill', 'code', 'short_answer']);
   
   // 获取当前用户ID - 如果已登录则使用实际ID，否则使用默认ID
   const getUserId = () => {
@@ -298,6 +302,14 @@ export default function Practice() {
       return `${diffDays}天前`;
     } else {
       return date.toLocaleDateString('zh-CN');
+    }
+  };
+  
+  const toggleQuestionType = (type: string) => {
+    if (questionTypes.includes(type)) {
+      setQuestionTypes(prev => prev.filter(t => t !== type));
+    } else {
+      setQuestionTypes(prev => [...prev, type]);
     }
   };
   
@@ -591,26 +603,147 @@ export default function Practice() {
             )}
           </div>
           
-          {/* 题目数量选择器 */}
+          {/* 题目选择区域 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">练习设置</h3>
+            <div className="space-y-6">
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    每次练习题目数量
-                  </label>
-                  <select
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <h2 className="text-xl font-semibold">选择练习类型</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    variant={practiceType === 'daily' ? "default" : "outline"}
+                    className="h-24"
+                    onClick={() => setPracticeType('daily')}
                   >
-                    <option value={5}>5题</option>
-                    <option value={10}>10题</option>
-                    <option value={15}>15题</option>
-                    <option value={20}>20题</option>
-                    <option value={25}>25题</option>
-                  </select>
+                    <div className="space-y-2">
+                      <Calendar className="h-6 w-6 mx-auto" />
+                      <div>每日练习</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant={practiceType === 'category' ? "default" : "outline"}
+                    className="h-24"
+                    onClick={() => setPracticeType('category')}
+                  >
+                    <div className="space-y-2">
+                      <BookOpen className="h-6 w-6 mx-auto" />
+                      <div>分类练习</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant={practiceType === 'review' ? "default" : "outline"}
+                    className="h-24"
+                    onClick={() => setPracticeType('review')}
+                  >
+                    <div className="space-y-2">
+                      <RotateCcw className="h-6 w-6 mx-auto" />
+                      <div>错题复习</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant={practiceType === 'random' ? "default" : "outline"}
+                    className="h-24"
+                    onClick={() => setPracticeType('random')}
+                  >
+                    <div className="space-y-2">
+                      <Shuffle className="h-6 w-6 mx-auto" />
+                      <div>随机练习</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+
+              {practiceType === 'category' && (
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">选择分类</h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    {categories.map((category) => (
+                      <Button
+                        key={category.name}
+                        variant={selectedCategory === category.name ? "default" : "outline"}
+                        className="h-12"
+                        onClick={() => setSelectedCategory(category.name)}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">选择难度</h2>
+                <div className="grid grid-cols-3 gap-4">
+                  <Button
+                    variant={difficulty === 'easy' ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => setDifficulty('easy')}
+                  >
+                    简单
+                  </Button>
+                  <Button
+                    variant={difficulty === 'medium' ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => setDifficulty('medium')}
+                  >
+                    中等
+                  </Button>
+                  <Button
+                    variant={difficulty === 'hard' ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => setDifficulty('hard')}
+                  >
+                    困难
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold">选择题目类型</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    variant={questionTypes.includes('choice') ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => toggleQuestionType('choice')}
+                  >
+                    单选题
+                  </Button>
+                  <Button
+                    variant={questionTypes.includes('multiple') ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => toggleQuestionType('multiple')}
+                  >
+                    多选题
+                  </Button>
+                  <Button
+                    variant={questionTypes.includes('judge') ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => toggleQuestionType('judge')}
+                  >
+                    判断题
+                  </Button>
+                  <Button
+                    variant={questionTypes.includes('fill') ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => toggleQuestionType('fill')}
+                  >
+                    填空题
+                  </Button>
+                  <Button
+                    variant={questionTypes.includes('code') ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => toggleQuestionType('code')}
+                  >
+                    编程题
+                  </Button>
+                  <Button
+                    variant={questionTypes.includes('short_answer') ? "default" : "outline"}
+                    className="h-12"
+                    onClick={() => toggleQuestionType('short_answer')}
+                  >
+                    简答题
+                  </Button>
                 </div>
               </div>
             </div>

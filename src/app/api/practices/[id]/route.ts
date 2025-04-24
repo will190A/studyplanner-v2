@@ -176,7 +176,10 @@ export async function PUT(
         let isCorrect = false;
         const userAnswer = answers[questionId];
         
-        if (Array.isArray(question.answer)) {
+        if (question.type === 'short_answer') {
+          // 简答题总是返回正确，让用户自己比对
+          isCorrect = true;
+        } else if (Array.isArray(question.answer)) {
           // 多选题
           if (Array.isArray(userAnswer)) {
             // 排序两个数组，确保顺序不同但内容相同的答案也能被判定为正确
