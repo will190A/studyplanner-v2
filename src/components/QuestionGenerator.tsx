@@ -27,7 +27,7 @@ import * as z from 'zod';
 import Image from 'next/image';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -89,6 +89,7 @@ export default function QuestionGenerator() {
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { toast } = useToast();
 
   // 获取自定义题库列表
   useEffect(() => {

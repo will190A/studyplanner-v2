@@ -247,29 +247,32 @@ export default function Practice() {
   // 删除题库
   const deleteLibrary = async (libraryName: string) => {
     try {
+      // 立即更新本地状态，提供即时反馈
+      setCustomLibraries(prev => prev.filter(lib => lib.name !== libraryName));
+      
       const response = await fetch(`/api/questions/library?subject=${encodeURIComponent(libraryName)}`, {
         method: 'DELETE',
       });
       
-      const data = await response.json();
-      
       if (!response.ok) {
+        const data = await response.json();
+        // 如果删除失败，恢复原来的状态
+        setCustomLibraries(prev => [...prev, customLibraries.find(lib => lib.name === libraryName)!]);
         throw new Error(data.error || '删除题库失败');
       }
-      
-      // 更新本地状态
-      setCustomLibraries(prev => prev.filter(lib => lib.name !== libraryName));
-      
+
       toast({
         title: "删除成功",
-        description: data.message || `已删除题库"${libraryName}"`,
+        description: `题库"${libraryName}"已删除`,
+        duration: 2000
       });
+      
     } catch (error) {
       console.error('删除题库失败:', error);
       toast({
         title: "删除失败",
         description: error instanceof Error ? error.message : "删除题库时出现错误",
-        variant: "destructive"
+        duration: 3000
       });
     } finally {
       setDeletingLibrary(null);
@@ -504,15 +507,26 @@ export default function Practice() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 border rounded-lg border-dashed">
-                        <Sparkles className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                        <p className="text-gray-500 mb-4">您还没有自定义题库</p>
-                        <Link href="/practice/generator">
-                          <Button className="bg-gradient-to-r from-amber-500 to-orange-600">
-                            <Plus className="mr-2 h-4 w-4" />
-                            创建自定义题库
-                          </Button>
-                        </Link>
+                      <div className="border rounded-lg p-5 shadow-sm bg-white">
+                        <div className="flex flex-col items-center">
+                          <div className="flex items-center justify-center mb-4">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 flex items-center justify-center mr-3">
+                              <Sparkles className="h-5 w-5 text-white" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-800">创建您的第一个自定义题库</h3>
+                          </div>
+                          
+                          <p className="text-gray-600 text-center mb-6 max-w-md">
+                            使用AI智能导题功能，根据您的学习需求生成专业题目
+                          </p>
+                          
+                          <Link href="/practice/generator">
+                            <Button className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-sm">
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              开始创建自定义题库
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     )}
                   </div>
