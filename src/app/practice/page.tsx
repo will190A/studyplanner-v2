@@ -324,6 +324,85 @@ export default function Practice() {
             </Alert>
           )}
           
+          {/* 每日一练、错题本和随机练习卡片 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* 每日一练卡片 */}
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <Target className="w-5 h-5 mr-2 text-blue-600" />
+                    每日一练
+                  </CardTitle>
+                  <div className="flex -space-x-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-green-500 flex items-center justify-center">
+                        <CheckCircle2 className="w-4 h-4 text-white" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">今日推荐题目已就绪</p>
+                  <Button 
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={() => router.push('/daily')}
+                  >
+                    开始今日练习
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 错题本卡片 */}
+            <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <History className="w-5 h-5 mr-2 text-red-600" />
+                  错题本
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-600">待复习错题</p>
+                    <span className="text-lg font-semibold text-red-600">{mistakeCount}</span>
+                  </div>
+                  <Button 
+                    className="w-full bg-red-600 hover:bg-red-700"
+                    onClick={() => router.push('/mistakes')}
+                  >
+                    复习错题
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 随机练习卡片 */}
+            <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Target className="w-5 h-5 mr-2 text-purple-600" />
+                  随机练习
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">随机抽取多个题目练习</p>
+                  <Button 
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    onClick={createRandomPractice}
+                    disabled={loading}
+                  >
+                    开始随机练习
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
           {/* 题库区域 */}
           <div className="mb-8">
             <Card>
@@ -442,84 +521,6 @@ export default function Practice() {
             </Card>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* 每日一练卡片 */}
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center">
-                    <Target className="w-5 h-5 mr-2 text-blue-600" />
-                    每日一练
-                  </CardTitle>
-                  <div className="flex -space-x-1">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-green-500 flex items-center justify-center">
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">今日推荐题目已就绪</p>
-                  <Button 
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    onClick={() => router.push('/daily')}
-                  >
-                    开始今日练习
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 错题本卡片 */}
-            <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <History className="w-5 h-5 mr-2 text-red-600" />
-                  错题本
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm text-gray-600">待复习错题</p>
-                    <span className="text-lg font-semibold text-red-600">{mistakeCount}</span>
-                  </div>
-                  <Button 
-                    className="w-full bg-red-600 hover:bg-red-700"
-                    onClick={() => router.push('/mistakes')}
-                  >
-                    复习错题
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 随机练习卡片 */}
-            <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Target className="w-5 h-5 mr-2 text-purple-600" />
-                  随机练习
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">随机抽取多个题目练习</p>
-                  <Button 
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                    onClick={createRandomPractice}
-                    disabled={loading}
-                  >
-                    开始随机练习
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* 最近练习 */}
           <div className="mb-12">
             <div className="flex items-center mb-4">
