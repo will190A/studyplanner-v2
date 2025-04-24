@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle2, FileUp, Clock, Sparkles, Plus, AlertCircle } from 'lucide-react';
+import { CheckCircle2, FileUp, Clock, Sparkles, Plus, AlertCircle, BookOpen, Clipboard } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -328,293 +328,247 @@ export default function QuestionGenerator() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <Card>
-            <CardContent className="pt-6">
-              <FormField
-                control={form.control}
-                name="inputMethod"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>选择导入方式</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-1"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="courseName" id="courseName" />
-                          <Label htmlFor="courseName">输入课程名称</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="paste" id="paste" />
-                          <Label htmlFor="paste">粘贴教材内容</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="upload" id="upload" />
-                          <Label htmlFor="upload">上传文件</Label>
-                        </div>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 课程名输入 */}
-              {(inputMethod === 'courseName' || inputMethod === 'paste' || inputMethod === 'upload') && (
-                <FormField
-                  control={form.control}
-                  name="courseName"
-                  render={({ field }) => (
-                    <FormItem className="mt-4">
-                      <FormLabel>
-                        {inputMethod === 'courseName' ? '课程名称' : '题库名称 (可选)'}
-                      </FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder={inputMethod === 'courseName' ? "请输入课程名称，如：数据结构" : "留空将从内容自动提取"}
-                          {...field} 
-                          required={inputMethod === 'courseName'}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {/* 内容粘贴区域 */}
-              {inputMethod === 'paste' && (
-                <FormField
-                  control={form.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem className="mt-4">
-                      <FormLabel>粘贴教材内容</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="粘贴教材、课件或笔记内容 (最多5000字符)"
-                          className="h-32 resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {/* 文件上传区域 */}
-              {inputMethod === 'upload' && (
-                <div className="mt-4 space-y-2">
-                  <FormLabel>上传文件</FormLabel>
-                  
-                  {!form.getValues('file') ? (
-                    <div 
-                      className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary cursor-pointer transition-colors"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <div className="flex flex-col items-center">
-                        <FileUp className="h-10 w-10 text-gray-400 mb-2" />
-                        <p className="text-sm font-medium text-gray-700 mb-1">点击或拖拽文件到此处上传</p>
-                        <p className="text-xs text-gray-500">支持 TXT, DOC, DOCX, JSON 格式</p>
-                      </div>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept=".txt,.doc,.docx,.json"
-                        onChange={handleFileChange}
-                      />
-                    </div>
-                  ) : (
-                    <div className="border rounded-lg p-4 flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-3">
-                          <FileUp className="h-5 w-5 text-blue-500" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-700 truncate max-w-xs">
-                            {(form.getValues('file') as File).name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {((form.getValues('file') as File).size / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearFileSelection}
-                      >
-                        重新选择
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 选择题型 */}
-              <FormField
-                control={form.control}
-                name="questionTypes"
-                render={() => (
-                  <FormItem className="mt-6">
-                    <div className="mb-2">
-                      <FormLabel>题型选择 (可多选)</FormLabel>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {questionTypeOptions.map((option) => (
-                        <FormField
-                          key={option.id}
-                          control={form.control}
-                          name="questionTypes"
-                          render={({ field }) => {
-                            return (
-                              <FormItem
-                                key={option.id}
-                                className="flex items-center space-x-1"
-                              >
-                                <FormControl>
-                                  <Button
-                                    type="button"
-                                    variant={field.value?.includes(option.id) ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => {
-                                      const current = [...field.value || []];
-                                      const index = current.indexOf(option.id);
-                                      if (index > -1) {
-                                        current.splice(index, 1);
-                                      } else {
-                                        current.push(option.id);
-                                      }
-                                      field.onChange(current.length > 0 ? current : [option.id]);
-                                    }}
-                                  >
-                                    {field.value?.includes(option.id) && (
-                                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                                    )}
-                                    {option.name}
-                                  </Button>
-                                </FormControl>
-                              </FormItem>
-                            );
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 题目数量选择 */}
-              <FormField
-                control={form.control}
-                name="count"
-                render={({ field }) => (
-                  <FormItem className="mt-6">
-                    <FormLabel>生成题目数量</FormLabel>
-                    <FormControl>
-                      <div className="flex flex-wrap gap-2">
-                        {countOptions.map((option) => (
-                          <Button
-                            key={option.value}
-                            type="button"
-                            variant={field.value === option.value ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => field.onChange(option.value)}
-                          >
-                            {option.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 题库保存选项 */}
-              <div className="mt-6 border-t pt-4">
-                <FormField
-                  control={form.control}
-                  name="addToExisting"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="addToExisting"
-                            checked={field.value}
-                            onChange={field.onChange}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary-focus"
-                          />
-                          <Label htmlFor="addToExisting">添加到已有题库</Label>
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-
-                {addToExisting ? (
+          <Card className="w-full">
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 gap-8">
+                {/* 导入方式选择 */}
+                <div className="w-full">
                   <FormField
                     control={form.control}
-                    name="existingLibrary"
+                    name="inputMethod"
                     render={({ field }) => (
-                      <FormItem className="mt-2">
-                        <FormLabel>选择已有题库</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="选择题库" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {customLibraries.length > 0 ? (
-                              customLibraries.map((library) => (
-                                <SelectItem key={library.name} value={library.name}>
-                                  {library.name} ({library.count}题)
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value="none" disabled>
-                                暂无自定义题库
-                              </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                      <FormItem className="space-y-3">
+                        <FormLabel>选择导入方式</FormLabel>
+                        <FormControl>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div 
+                              className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                field.value === 'courseName' 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-gray-200 hover:border-primary/50'
+                              }`}
+                              onClick={() => field.onChange('courseName')}
+                            >
+                              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                                <BookOpen className="h-6 w-6 text-primary" />
+                              </div>
+                              <span className="text-sm font-medium">输入课程名称</span>
+                            </div>
+                            <div 
+                              className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                field.value === 'paste' 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-gray-200 hover:border-primary/50'
+                              }`}
+                              onClick={() => field.onChange('paste')}
+                            >
+                              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                                <Clipboard className="h-6 w-6 text-primary" />
+                              </div>
+                              <span className="text-sm font-medium">粘贴教材内容</span>
+                            </div>
+                            <div 
+                              className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                                field.value === 'upload' 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-gray-200 hover:border-primary/50'
+                              }`}
+                              onClick={() => field.onChange('upload')}
+                            >
+                              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                                <FileUp className="h-6 w-6 text-primary" />
+                              </div>
+                              <span className="text-sm font-medium">上传文件</span>
+                            </div>
+                          </div>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                ) : (
+                </div>
+
+                {/* 输入区域 */}
+                <div className="w-full">
+                  {/* 课程名输入 */}
                   <FormField
                     control={form.control}
-                    name="libraryName"
+                    name="courseName"
                     render={({ field }) => (
-                      <FormItem className="mt-2">
-                        <FormLabel>题库名称 (可选)</FormLabel>
+                      <FormItem className="mt-6">
+                        <FormLabel>
+                          {inputMethod === 'courseName' ? '课程名称' : '题库名称 (可选)'}
+                        </FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder="留空则使用课程名称作为题库名" 
+                            placeholder={inputMethod === 'courseName' ? "请输入课程名称，如：数据结构" : "留空将从内容自动提取"}
                             {...field} 
+                            required={inputMethod === 'courseName'}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
+
+                  {/* 内容粘贴区域 */}
+                  {inputMethod === 'paste' && (
+                    <FormField
+                      control={form.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem className="mt-6">
+                          <FormLabel>粘贴教材内容</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="粘贴教材、课件或笔记内容 (最多5000字符)"
+                              className="h-32 resize-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {/* 文件上传区域 */}
+                  {inputMethod === 'upload' && (
+                    <div className="mt-6">
+                      <FormLabel>上传文件</FormLabel>
+                      {!form.getValues('file') ? (
+                        <div 
+                          className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary cursor-pointer transition-colors"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <div className="flex flex-col items-center">
+                            <FileUp className="h-10 w-10 text-gray-400 mb-2" />
+                            <p className="text-sm font-medium text-gray-700 mb-1">点击或拖拽文件到此处上传</p>
+                            <p className="text-xs text-gray-500">支持 TXT, DOC, DOCX, JSON 格式</p>
+                          </div>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept=".txt,.doc,.docx,.json"
+                            onChange={handleFileChange}
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-2 border rounded-lg p-4 flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-3">
+                              <FileUp className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-700 truncate max-w-xs">
+                                {(form.getValues('file') as File).name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {((form.getValues('file') as File).size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFileSelection}
+                          >
+                            重新选择
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 题型和数量选择 */}
+                <div className="w-full">
+                  {/* 选择题型 */}
+                  <FormField
+                    control={form.control}
+                    name="questionTypes"
+                    render={() => (
+                      <FormItem className="mt-6">
+                        <div className="mb-2">
+                          <FormLabel>题型选择 (可多选)</FormLabel>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {questionTypeOptions.map((option) => (
+                            <FormField
+                              key={option.id}
+                              control={form.control}
+                              name="questionTypes"
+                              render={({ field }) => {
+                                return (
+                                  <FormItem
+                                    key={option.id}
+                                    className="flex items-center space-x-1"
+                                  >
+                                    <FormControl>
+                                      <Button
+                                        type="button"
+                                        variant={field.value?.includes(option.id) ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => {
+                                          const current = [...field.value || []];
+                                          const index = current.indexOf(option.id);
+                                          if (index > -1) {
+                                            current.splice(index, 1);
+                                          } else {
+                                            current.push(option.id);
+                                          }
+                                          field.onChange(current.length > 0 ? current : [option.id]);
+                                        }}
+                                      >
+                                        {field.value?.includes(option.id) && (
+                                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                                        )}
+                                        {option.name}
+                                      </Button>
+                                    </FormControl>
+                                  </FormItem>
+                                );
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* 题目数量选择 */}
+                  <FormField
+                    control={form.control}
+                    name="count"
+                    render={({ field }) => (
+                      <FormItem className="mt-6">
+                        <FormLabel>生成题目数量</FormLabel>
+                        <FormControl>
+                          <div className="flex flex-wrap gap-2">
+                            {countOptions.map((option) => (
+                              <Button
+                                key={option.value}
+                                type="button"
+                                variant={field.value === option.value ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => field.onChange(option.value)}
+                              >
+                                {option.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -624,7 +578,7 @@ export default function QuestionGenerator() {
             <Button 
               type="submit" 
               size="lg" 
-              className="w-full md:w-auto px-8 bg-gradient-to-r from-amber-500 to-orange-600"
+              className="w-full md:w-auto px-8 bg-gradient-to-r from-purple-500 to-purple-600"
               disabled={loading}
             >
               {loading ? (
