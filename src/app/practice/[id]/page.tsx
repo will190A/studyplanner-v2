@@ -122,7 +122,9 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         setPractice(data)
         
         // 获取所有题目
-        const practiceQuestions = data.questions.map((q: PracticeQuestion) => q.questionDetail)
+        const practiceQuestions = data.questions
+          .map((q: PracticeQuestion) => q.questionDetail)
+          .filter((q): q is Question => q !== null && q !== undefined);
         setQuestions(practiceQuestions)
         
         // 如果练习已完成，获取所有的答案和解析并停止计时
@@ -451,6 +453,12 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           {/* 题目导航 */}
           <div className="mb-6 flex flex-wrap gap-2">
             {questions.map((q, index) => {
+              // 添加对null值的检查
+              if (!q) {
+                console.error(`题目${index}数据为空`);
+                return null; // 跳过空题目
+              }
+              
               const isAnswered = !!answers[q._id]
               const isRevealed = !!revealedAnswers[q._id]
               // 使用服务器返回的题目正确性状态

@@ -1,361 +1,709 @@
 'use client'
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Lightbulb, Upload, FileText } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useState, useEffect, useRef } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { CheckCircle2, FileUp, Clock, Sparkles, Plus, AlertCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import Image from 'next/image';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { toast } from '@/components/ui/use-toast';
+import { useRouter } from 'next/navigation';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 
-interface Question {
-  id: string
-  type: string
-  content: string
-  options?: string[]
-  answer: string
-  explanation: string
-  subject: string
-}
+// 生成器表单验证
+const generatorFormSchema = z.object({
+  inputMethod: z.enum(['courseName', 'paste', 'upload']),
+  courseName: z.string().optional(),
+  content: z.string().optional(),
+  file: z.any().optional(),
+  questionTypes: z.array(z.string()).min(1, '请至少选择一种题型'),
+  count: z.string().min(1, '请选择生成题目数量'),
+  libraryName: z.string().optional(),
+  addToExisting: z.boolean().default(false),
+  existingLibrary: z.string().optional(),
+});
 
-const questionTypes = [
-  { id: "multiple_choice", label: "单选题" },
-  { id: "multiple_answer", label: "多选题" },
-  { id: "fill_blank", label: "填空题" },
-  { id: "short_answer", label: "简答题" },
-  { id: "true_false", label: "判断题" },
-]
+type GeneratorFormValues = z.infer<typeof generatorFormSchema>;
+
+// 问题类型选项
+const questionTypeOptions = [
+  { id: 'multiple_choice', name: '单选题' },
+  { id: 'multiple_answer', name: '多选题' },
+  { id: 'fill_blank', name: '填空题' },
+  { id: 'short_answer', name: '简答题' },
+  { id: 'true_false', name: '判断题' },
+];
+
+// 题目数量选项
+const countOptions = [
+  { value: '3', label: '3题' },
+  { value: '5', label: '5题' },
+  { value: '10', label: '10题' },
+  { value: '15', label: '15题' },
+  { value: '20', label: '20题' },
+];
+
+// 估算生成时间（秒）
+const estimateGenerationTime = (count: number): number => {
+  // 基础时间10秒，每道题增加5秒
+  return 10 + count * 5;
+};
 
 export default function QuestionGenerator() {
-  const [courseName, setCourseName] = useState("")
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
-  const [file, setFile] = useState<File | null>(null)
-  const [content, setContent] = useState("")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([])
-  const [questionCount, setQuestionCount] = useState("5")
-  const { toast } = useToast()
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [customLibraries, setCustomLibraries] = useState<{name: string, count: number}[]>([]);
+  const [successDialog, setSuccessDialog] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationTime, setGenerationTime] = useState(0);
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
+  // 获取自定义题库列表
+  useEffect(() => {
+    fetchCustomLibraries();
+  }, []);
+
+  const fetchCustomLibraries = async () => {
+    try {
+      const response = await fetch('/api/questions/library?limit=100');
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data && data.questions && Array.isArray(data.questions)) {
+          // 按科目分组题目
+          const subjectGroups: Record<string, any[]> = {};
+          
+          data.questions.forEach((question: any) => {
+            if (!subjectGroups[question.subject]) {
+              subjectGroups[question.subject] = [];
+            }
+            subjectGroups[question.subject].push(question);
+          });
+          
+          // 转换为数组格式
+          const libraries = Object.entries(subjectGroups).map(([subject, questions]) => ({
+            name: subject,
+            count: questions.length
+          }));
+          
+          setCustomLibraries(libraries);
+        }
+      }
+    } catch (error) {
+      console.error('获取自定义题库失败:', error);
     }
-  }
+  };
 
-  const handleTypeChange = (typeId: string) => {
-    setSelectedTypes(prev =>
-      prev.includes(typeId)
-        ? prev.filter(id => id !== typeId)
-        : [...prev, typeId]
-    )
-  }
-
-  const getGenerationSource = (activeTab: string) => {
-    if (activeTab === "courseName") {
-      return { type: "courseName", data: courseName }
-    } else if (activeTab === "content") {
-      return { type: "content", data: content }
-    } else {
-      return { type: "file", data: file }
+  // 表单处理
+  const form = useForm<GeneratorFormValues>({
+    resolver: zodResolver(generatorFormSchema),
+    defaultValues: {
+      inputMethod: 'courseName',
+      courseName: '',
+      content: '',
+      questionTypes: ['multiple_choice'],
+      count: '5',
+      addToExisting: false,
+      existingLibrary: '',
     }
-  }
+  });
 
-  const handleGenerate = async (activeTab: string) => {
-    const source = getGenerationSource(activeTab)
+  // 监听输入方式变化
+  const inputMethod = form.watch('inputMethod');
+  const addToExisting = form.watch('addToExisting');
+  
+  // 当paste或upload时，自动从内容中提取可能的课程名称
+  useEffect(() => {
+    if (inputMethod === 'paste') {
+      const content = form.getValues('content');
+      if (content && !form.getValues('courseName')) {
+        // 尝试从内容中提取可能的课程名
+        const possibleTitle = extractCourseName(content);
+        if (possibleTitle) {
+          form.setValue('courseName', possibleTitle);
+        }
+      }
+    }
+  }, [form.watch('content')]);
+
+  // 从内容中提取可能的课程名称
+  const extractCourseName = (content: string): string => {
+    // 查找常见的课程名称格式
+    // 例如：第一章 XXX课程，XXX导论，XXX概论，等
+    const patterns = [
+      /《([^》]{2,20})》/,  // 查找书名号中的内容
+      /第[一二三四五六七八九十\d]+章\s*([^\n]{2,20})/,  // 查找章节标题
+      /(\w{2,20})(概论|导论|原理|基础|入门)/,  // 查找常见课程后缀
+      /(\w{2,20})(学)/  // 查找"XX学"的模式
+    ];
     
-    if ((source.type === "courseName" && !courseName) || 
-        (source.type === "content" && !content) || 
-        (source.type === "file" && !file)) {
-      toast({
-        title: "错误",
-        description: `请${source.type === "courseName" ? "输入课程名称" : source.type === "content" ? "输入课本或PPT内容" : "上传文件"}`,
-        variant: "destructive",
-      })
-      return
+    for (const pattern of patterns) {
+      const match = content.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
     }
-
-    if (selectedTypes.length === 0) {
-      toast({
-        title: "错误",
-        description: "请至少选择一种题型",
-        variant: "destructive",
-      })
-      return
+    
+    // 如果没有找到匹配的模式，尝试提取内容的前几个字符作为标题
+    if (content.length > 10) {
+      const firstLine = content.split('\n')[0].trim();
+      if (firstLine.length > 5 && firstLine.length < 30) {
+        return firstLine;
+      }
     }
+    
+    return '';
+  };
 
-    setIsGenerating(true)
+  // 处理文件上传
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      form.setValue('file', file);
+      
+      // 从文件名中提取可能的课程名
+      const fileName = file.name.replace(/\.\w+$/, '');
+      if (fileName.length >= 2 && fileName.length <= 20 && !form.getValues('courseName')) {
+        form.setValue('courseName', fileName);
+      }
+    }
+  };
+
+  // 开始AI生成题目
+  const onSubmit = async (data: GeneratorFormValues) => {
     try {
-      const formData = new FormData()
+      setLoading(true);
+      setQuestions([]);
       
-      if (source.type === "courseName") {
-        formData.append("courseName", courseName)
-      } else if (source.type === "content") {
-        formData.append("content", content)
-        // 如果是内容但没有指定课程名，则使用一个默认值
-        if (!courseName) {
-          formData.append("courseName", "未命名课程")
-        } else {
-          formData.append("courseName", courseName)
-        }
-      } else if (source.type === "file" && file) {
-        formData.append("file", file)
-        // 如果是文件但没有指定课程名，则使用文件名作为课程名
-        if (!courseName) {
-          const fileName = file.name.split('.')[0]
-          formData.append("courseName", fileName)
-        } else {
-          formData.append("courseName", courseName)
-        }
+      // 准备表单数据
+      const formData = new FormData();
+      
+      // 如果用户选择添加到现有题库，并且已选择题库
+      let finalLibraryName = data.courseName || '';
+      if (data.addToExisting && data.existingLibrary) {
+        finalLibraryName = data.existingLibrary;
+      } else if (data.libraryName) {
+        finalLibraryName = data.libraryName;
+      }
+
+      // 添加必要字段到表单
+      formData.append('courseName', finalLibraryName);
+      formData.append('types', JSON.stringify(data.questionTypes));
+      formData.append('count', data.count);
+      
+      // 根据输入方式添加不同内容
+      if (data.inputMethod === 'paste' && data.content) {
+        formData.append('content', data.content);
+      } else if (data.inputMethod === 'upload' && data.file) {
+        formData.append('file', data.file);
       }
       
-      formData.append("types", JSON.stringify(selectedTypes))
-      formData.append("count", questionCount)
-
-      const response = await fetch("/api/questions/generate", {
-        method: "POST",
-        body: formData,
-      })
-
+      // 开始进度指示
+      const estimatedTime = estimateGenerationTime(parseInt(data.count));
+      setGenerationTime(estimatedTime);
+      setGenerationProgress(0);
+      
+      // 设置进度条更新
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+      }
+      
+      progressInterval.current = setInterval(() => {
+        setGenerationProgress(prev => {
+          // 逐渐增加到90%，留10%给最终的解析和处理
+          if (prev < 90) {
+            return prev + (90 - prev) / 10;
+          }
+          return prev;
+        });
+      }, 1000);
+      
+      // 发送请求
+      const response = await fetch('/api/questions/generate', {
+        method: 'POST',
+        body: formData
+      });
+      
+      // 设置进度为100%
+      setGenerationProgress(100);
+      
       if (!response.ok) {
-        throw new Error("生成题目失败")
+        const errorData = await response.json();
+        throw new Error(errorData.error || '生成题目失败');
       }
-
-      const data = await response.json()
-      setGeneratedQuestions(data.questions)
       
+      const result = await response.json();
+      
+      // 检查是否有警告信息
+      if (result.warning) {
+        toast({
+          title: "提示",
+          description: result.warning,
+          variant: "default"
+        });
+      }
+      
+      if (result.questions && result.questions.length > 0) {
+        setQuestions(result.questions);
+        
+        // 保存到题库
+        const saveResponse = await fetch('/api/questions/library', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            questions: result.questions,
+          }),
+        });
+        
+        if (saveResponse.ok) {
+          setSuccessDialog(true);
+        } else {
+          throw new Error('保存题目到题库失败');
+        }
+      } else {
+        throw new Error('生成的题目为空');
+      }
+    } catch (error: any) {
+      console.error('生成题目失败:', error);
       toast({
-        title: "成功",
-        description: `成功生成${data.questions.length}道题目`,
-      })
-    } catch (error) {
-      toast({
-        title: "错误",
-        description: "生成题目时出现错误",
-        variant: "destructive",
-      })
+        title: "生成失败",
+        description: error.message || "生成题目时发生错误",
+        variant: "destructive"
+      });
     } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const handleAddToLibrary = async () => {
-    try {
-      const response = await fetch("/api/questions/library", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          questions: generatedQuestions,
-          courseName: courseName || (file ? file.name.split('.')[0] : "未命名课程"),
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("添加到题库失败")
+      setLoading(false);
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+        progressInterval.current = null;
       }
-
-      toast({
-        title: "成功",
-        description: "题目已添加到您的自定义题库",
-      })
-      
-      // 清空生成的题目
-      setGeneratedQuestions([])
-      setCourseName("")
-      setSelectedTypes([])
-      setFile(null)
-      setContent("")
-    } catch (error) {
-      toast({
-        title: "错误",
-        description: "添加到题库时出现错误",
-        variant: "destructive",
-      })
     }
-  }
+  };
 
-  const renderTypeLabel = (type: string) => {
-    switch(type) {
-      case "multiple_choice": return "单选题";
-      case "multiple_answer": return "多选题";
-      case "fill_blank": return "填空题";
-      case "short_answer": return "简答题";
-      case "true_false": return "判断题";
-      default: return type;
+  // 清除文件选择
+  const clearFileSelection = () => {
+    form.setValue('file', undefined);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
-  }
+  };
+
+  // 返回题库页面
+  const backToLibrary = () => {
+    router.push('/practice');
+  };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>智能导题</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="courseName">
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="courseName" className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4" />
-              <span>课程名称</span>
-            </TabsTrigger>
-            <TabsTrigger value="content" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              <span>内容粘贴</span>
-            </TabsTrigger>
-            <TabsTrigger value="file" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              <span>文件上传</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          <div className="space-y-4 mb-4">
-            <div className="space-y-2">
-              <Label htmlFor="courseName">课程名称</Label>
-              <Input
-                id="courseName"
-                placeholder="输入课程名称，如：操作系统、数据结构"
-                value={courseName}
-                onChange={(e) => setCourseName(e.target.value)}
+    <div className="w-full max-w-4xl mx-auto">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          <Card>
+            <CardContent className="pt-6">
+              <FormField
+                control={form.control}
+                name="inputMethod"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>选择导入方式</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex flex-col space-y-1"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="courseName" id="courseName" />
+                          <Label htmlFor="courseName">输入课程名称</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="paste" id="paste" />
+                          <Label htmlFor="paste">粘贴教材内容</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="upload" id="upload" />
+                          <Label htmlFor="upload">上传文件</Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            
-            <TabsContent value="courseName">
-              <div className="space-y-2">
-                <p className="text-sm text-gray-500">
-                  输入课程名称，AI将根据课程自动生成相关题目。
-                </p>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="content">
-              <div className="space-y-2">
-                <Label htmlFor="content">粘贴课本或PPT内容</Label>
-                <Textarea
-                  id="content"
-                  placeholder="将教材内容、PPT文本或其他学习资料粘贴到这里..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="min-h-[150px]"
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="file">
-              <div className="space-y-2">
-                <Label>上传教材或题库文件</Label>
-                <Input
-                  type="file"
-                  accept=".pdf,.txt,.json,.xlsx,.xls,.docx,.doc"
-                  onChange={handleFileChange}
-                />
-                <p className="text-sm text-gray-500">
-                  支持PDF、Word、TXT、Excel、JSON格式
-                </p>
-              </div>
-            </TabsContent>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>题目数量</Label>
-                <Select 
-                  value={questionCount} 
-                  onValueChange={setQuestionCount}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择题目数量" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3道题</SelectItem>
-                    <SelectItem value="5">5道题</SelectItem>
-                    <SelectItem value="10">10道题</SelectItem>
-                    <SelectItem value="15">15道题</SelectItem>
-                    <SelectItem value="20">20道题</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>题目类型</Label>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {questionTypes.map((type) => (
-                    <div key={type.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={type.id}
-                        checked={selectedTypes.includes(type.id)}
-                        onCheckedChange={() => handleTypeChange(type.id)}
+              {/* 课程名输入 */}
+              {(inputMethod === 'courseName' || inputMethod === 'paste' || inputMethod === 'upload') && (
+                <FormField
+                  control={form.control}
+                  name="courseName"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>
+                        {inputMethod === 'courseName' ? '课程名称' : '题库名称 (可选)'}
+                      </FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder={inputMethod === 'courseName' ? "请输入课程名称，如：数据结构" : "留空将从内容自动提取"}
+                          {...field} 
+                          required={inputMethod === 'courseName'}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* 内容粘贴区域 */}
+              {inputMethod === 'paste' && (
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem className="mt-4">
+                      <FormLabel>粘贴教材内容</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="粘贴教材、课件或笔记内容 (最多5000字符)"
+                          className="h-32 resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* 文件上传区域 */}
+              {inputMethod === 'upload' && (
+                <div className="mt-4 space-y-2">
+                  <FormLabel>上传文件</FormLabel>
+                  
+                  {!form.getValues('file') ? (
+                    <div 
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary cursor-pointer transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="flex flex-col items-center">
+                        <FileUp className="h-10 w-10 text-gray-400 mb-2" />
+                        <p className="text-sm font-medium text-gray-700 mb-1">点击或拖拽文件到此处上传</p>
+                        <p className="text-xs text-gray-500">支持 TXT, DOC, DOCX, JSON 格式</p>
+                      </div>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept=".txt,.doc,.docx,.json"
+                        onChange={handleFileChange}
                       />
-                      <Label htmlFor={type.id} className="text-sm">{type.label}</Label>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="border rounded-lg p-4 flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-3">
+                          <FileUp className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 truncate max-w-xs">
+                            {(form.getValues('file') as File).name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {((form.getValues('file') as File).size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFileSelection}
+                      >
+                        重新选择
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 选择题型 */}
+              <FormField
+                control={form.control}
+                name="questionTypes"
+                render={() => (
+                  <FormItem className="mt-6">
+                    <div className="mb-2">
+                      <FormLabel>题型选择 (可多选)</FormLabel>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {questionTypeOptions.map((option) => (
+                        <FormField
+                          key={option.id}
+                          control={form.control}
+                          name="questionTypes"
+                          render={({ field }) => {
+                            return (
+                              <FormItem
+                                key={option.id}
+                                className="flex items-center space-x-1"
+                              >
+                                <FormControl>
+                                  <Button
+                                    type="button"
+                                    variant={field.value?.includes(option.id) ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => {
+                                      const current = [...field.value || []];
+                                      const index = current.indexOf(option.id);
+                                      if (index > -1) {
+                                        current.splice(index, 1);
+                                      } else {
+                                        current.push(option.id);
+                                      }
+                                      field.onChange(current.length > 0 ? current : [option.id]);
+                                    }}
+                                  >
+                                    {field.value?.includes(option.id) && (
+                                      <CheckCircle2 className="mr-1 h-3 w-3" />
+                                    )}
+                                    {option.name}
+                                  </Button>
+                                </FormControl>
+                              </FormItem>
+                            );
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* 题目数量选择 */}
+              <FormField
+                control={form.control}
+                name="count"
+                render={({ field }) => (
+                  <FormItem className="mt-6">
+                    <FormLabel>生成题目数量</FormLabel>
+                    <FormControl>
+                      <div className="flex flex-wrap gap-2">
+                        {countOptions.map((option) => (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant={field.value === option.value ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => field.onChange(option.value)}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* 题库保存选项 */}
+              <div className="mt-6 border-t pt-4">
+                <FormField
+                  control={form.control}
+                  name="addToExisting"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2">
+                      <FormControl>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="addToExisting"
+                            checked={field.value}
+                            onChange={field.onChange}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary-focus"
+                          />
+                          <Label htmlFor="addToExisting">添加到已有题库</Label>
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {addToExisting ? (
+                  <FormField
+                    control={form.control}
+                    name="existingLibrary"
+                    render={({ field }) => (
+                      <FormItem className="mt-2">
+                        <FormLabel>选择已有题库</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择题库" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customLibraries.length > 0 ? (
+                              customLibraries.map((library) => (
+                                <SelectItem key={library.name} value={library.name}>
+                                  {library.name} ({library.count}题)
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="none" disabled>
+                                暂无自定义题库
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="libraryName"
+                    render={({ field }) => (
+                      <FormItem className="mt-2">
+                        <FormLabel>题库名称 (可选)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="留空则使用课程名称作为题库名" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 生成按钮 */}
+          <div className="flex justify-center">
+            <Button 
+              type="submit" 
+              size="lg" 
+              className="w-full md:w-auto px-8 bg-gradient-to-r from-amber-500 to-orange-600"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4 animate-pulse" />
+                  <span>AI正在生成题目...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  <span>开始生成题目</span>
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {/* 生成中显示进度条 */}
+          {loading && (
+            <Card className="p-4 border border-amber-200 bg-amber-50">
+              <div className="flex items-center mb-2">
+                <Clock className="h-5 w-5 text-amber-600 mr-2" />
+                <h3 className="font-medium text-amber-800">
+                  AI正在为您生成题目，请耐心等待...
+                </h3>
+              </div>
+              <div className="space-y-2">
+                <Progress value={generationProgress} className="h-2" />
+                <p className="text-xs text-amber-600 text-center">
+                  预计需要 {generationTime} 秒，已完成 {Math.round(generationProgress)}%
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  <AlertCircle className="h-3 w-3 inline mr-1" />
+                  提示：生成速度取决于题目数量和内容复杂度，AI正在分析内容并创建高质量题目
+                </p>
+              </div>
+            </Card>
+          )}
+        </form>
+      </Form>
+
+      {/* 生成成功弹窗 */}
+      <Dialog open={successDialog} onOpenChange={setSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-green-600">
+              <CheckCircle2 className="h-5 w-5 mr-2" />
+              题目生成成功
+            </DialogTitle>
+            <DialogDescription>
+              您的题目已成功生成并添加到题库中
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="rounded-lg bg-green-50 p-4 border border-green-100 mb-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">成功添加 {questions.length} 道题目到题库</h3>
+                  <div className="mt-2 text-sm text-green-700">
+                    <p>题库名称：{form.getValues('addToExisting') ? form.getValues('existingLibrary') : (form.getValues('libraryName') || form.getValues('courseName'))}</p>
+                    <p>题型组合：{form.getValues('questionTypes').map(id => questionTypeOptions.find(opt => opt.id === id)?.name).join('、')}</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <Button
-            onClick={() => handleGenerate(
-              document.querySelector('[data-state="active"][role="tab"]')?.getAttribute('value') || 'courseName'
-            )}
-            disabled={isGenerating}
-            className="w-full mb-4"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                生成中...
-              </>
-            ) : (
-              "生成题目"
-            )}
-          </Button>
-          
-          {generatedQuestions.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">生成的题目</h3>
-                <p className="text-sm text-gray-500">共 {generatedQuestions.length} 道题</p>
-              </div>
-              
-              <div className="max-h-[500px] overflow-y-auto pr-2">
-                {generatedQuestions.map((question, index) => (
-                  <Card key={question.id || index} className="overflow-hidden mb-3">
-                    <CardContent className="pt-4">
-                      <div className="space-y-2">
-                        <p className="font-medium">题目 {index + 1}（{renderTypeLabel(question.type)}）</p>
-                        <p>{question.content}</p>
-                        {question.options && (
-                          <div className="ml-4 space-y-1">
-                            {question.options.map((option, i) => (
-                              <p key={i} className="text-sm">{String.fromCharCode(65 + i)}. {option}</p>
-                            ))}
-                          </div>
-                        )}
-                        <div className="mt-2 p-2 bg-gray-50 rounded-md">
-                          <p className="text-sm font-medium text-gray-700">
-                            答案：{question.answer}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            解析：{question.explanation}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              
-              <Button onClick={handleAddToLibrary} className="w-full">
-                添加到自定义题库
-              </Button>
-            </div>
-          )}
-        </Tabs>
-      </CardContent>
-    </Card>
-  )
+          <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
+            <Button variant="outline" onClick={() => setSuccessDialog(false)}>
+              继续生成题目
+            </Button>
+            <Button onClick={backToLibrary}>
+              返回题库
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 } 

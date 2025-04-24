@@ -5,6 +5,23 @@ import connect from '@/lib/db';
 import Question from '@/models/Question';
 import Practice from '@/models/Practice';
 import Mistake from '@/models/Mistake';
+import mongoose from 'mongoose';
+
+// 定义CustomQuestion模型
+const customQuestionSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  type: { type: String, required: true, enum: ["multiple_choice", "fill_blank", "short_answer"] },
+  content: { type: String, required: true },
+  options: [String],
+  answer: { type: String, required: true },
+  explanation: { type: String },
+  subject: { type: String, required: true, index: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+// 确保模型只被创建一次
+const CustomQuestion = mongoose.models.CustomQuestion || 
+  mongoose.model("CustomQuestion", customQuestionSchema);
 
 // 获取用户练习记录
 export async function GET(request: Request) {
@@ -79,7 +96,7 @@ export async function POST(request: Request) {
       userId = session.user.id;
     }
     
-    const { type, category, count = 10 } = data;
+    const { type, category, count = 10, isCustom = false } = data;
     
     if (!type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -105,9 +122,40 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'Category is required for category practice' }, { status: 400 });
         }
         
-        questions = await Question.find({ category })
-          .select('-answer -explanation')
-          .limit(count);
+        if (isCustom) {
+          // 从自定义题库中获取题目
+          const customQuestions = await CustomQuestion.find({ 
+            userId, 
+            subject: category 
+          }).limit(count).lean();
+          
+          if (customQuestions.length === 0) {
+            return NextResponse.json({ error: '未找到相关题目，请先添加题目到该题库' }, { status: 404 });
+          }
+          
+          // 转换自定义题目为标准格式
+          questions = customQuestions.map(q => ({
+            _id: q._id,
+            title: q.subject,
+            content: q.content,
+            type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
+            options: q.options ? q.options.map((opt, index) => ({
+              label: String.fromCharCode(65 + index), // A, B, C...
+              text: opt
+            })) : [],
+            answer: q.answer,
+            explanation: q.explanation || '暂无解析'
+          }));
+        } else {
+          // 从标准题库中获取题目
+          questions = await Question.find({ category })
+            .select('-answer -explanation')
+            .limit(count);
+            
+          if (questions.length === 0) {
+            return NextResponse.json({ error: '未找到相关题目' }, { status: 404 });
+          }
+        }
         break;
         
       case 'review':
@@ -134,6 +182,11 @@ export async function POST(request: Request) {
         
       default:
         return NextResponse.json({ error: 'Invalid practice type' }, { status: 400 });
+    }
+    
+    // 如果没有找到题目
+    if (!questions || questions.length === 0) {
+      return NextResponse.json({ error: '未找到题目' }, { status: 404 });
     }
     
     // 创建练习记录

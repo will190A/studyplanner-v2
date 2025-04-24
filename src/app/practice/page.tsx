@@ -4,11 +4,23 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
-import { CheckCircle2, Target, BookOpen, History, Star, TrendingUp, Database, Code, Network, Server, Globe, Loader2, Sparkles, Plus } from 'lucide-react';
+import { CheckCircle2, Target, BookOpen, History, Star, TrendingUp, Database, Code, Network, Server, Globe, Loader2, Sparkles, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface Category {
   name: string;
@@ -19,12 +31,14 @@ interface Category {
 export default function Practice() {
   const router = useRouter();
   const { data: session } = useSession();
+  const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentPractices, setRecentPractices] = useState<any[]>([]);
   const [mistakeCount, setMistakeCount] = useState(0);
   const [customLibraries, setCustomLibraries] = useState<any[]>([]);
+  const [deletingLibrary, setDeletingLibrary] = useState<string | null>(null);
   
   // 获取当前用户ID - 如果已登录则使用实际ID，否则使用默认ID
   const getUserId = () => {
@@ -141,7 +155,8 @@ export default function Practice() {
           const libraries = Object.entries(subjectGroups).map(([subject, questions]) => ({
             name: subject,
             count: questions.length,
-            id: subject.toLowerCase().replace(/\s+/g, '-')
+            id: subject.toLowerCase().replace(/\s+/g, '-'),
+            isCustom: true // 标记为自定义题库
           }));
           
           setCustomLibraries(libraries);
@@ -153,7 +168,7 @@ export default function Practice() {
   };
   
   // 创建分类练习
-  const createCategoryPractice = async (category: string) => {
+  const createCategoryPractice = async (category: string, isCustom = false) => {
     try {
       setLoading(true);
       setError('');
@@ -170,20 +185,28 @@ export default function Practice() {
           type: 'category',
           category,
           count: 5, // 每次练习5题
-          userId // 使用当前用户ID
+          userId, // 使用当前用户ID
+          isCustom // 标记是否是自定义题库
         })
       });
       
       if (!response.ok) {
-        throw new Error('创建练习失败');
+        const errorData = await response.json();
+        throw new Error(errorData.error || '创建练习失败');
       }
       
       const data = await response.json();
       router.push(`/practice/${data.practice._id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('创建练习错误:', error);
-      setError('创建练习失败，请重试');
+      setError(error.message || '创建练习失败，请重试');
       setLoading(false);
+      
+      toast({
+        title: "创建练习失败",
+        description: error.message || "未找到相关题目或发生其他错误",
+        variant: "destructive"
+      });
     }
   };
   
@@ -218,6 +241,38 @@ export default function Practice() {
       console.error('创建练习错误:', error);
       setError('创建练习失败，请重试');
       setLoading(false);
+    }
+  };
+  
+  // 删除题库
+  const deleteLibrary = async (libraryName: string) => {
+    try {
+      const response = await fetch(`/api/questions/library?subject=${encodeURIComponent(libraryName)}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || '删除题库失败');
+      }
+      
+      // 更新本地状态
+      setCustomLibraries(prev => prev.filter(lib => lib.name !== libraryName));
+      
+      toast({
+        title: "删除成功",
+        description: data.message || `已删除题库"${libraryName}"`,
+      });
+    } catch (error) {
+      console.error('删除题库失败:', error);
+      toast({
+        title: "删除失败",
+        description: error instanceof Error ? error.message : "删除题库时出现错误",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingLibrary(null);
     }
   };
   
@@ -268,6 +323,124 @@ export default function Practice() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          
+          {/* 题库区域 */}
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BookOpen className="w-5 h-5 mr-2" />
+                  题库
+                </CardTitle>
+                <CardDescription>选择题库开始练习，或者创建自己的自定义题库</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-8">
+                  {/* 专业题库部分 */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">专业题库</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {categories.map((category) => (
+                        <Button 
+                          key={category.name}
+                          variant="outline" 
+                          className="flex-col h-auto p-4 justify-start items-start text-left"
+                          onClick={() => createCategoryPractice(category.name)}
+                          disabled={loading}
+                        >
+                          <div className="flex items-center w-full mb-2">
+                            {category.icon}
+                            <span className="font-medium">{category.name}</span>
+                          </div>
+                          <p className="text-xs text-gray-500">{category.description}</p>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* 自定义题库部分 */}
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-semibold">自定义题库</h3>
+                      <Link href="/practice/generator">
+                        <Button className="bg-gradient-to-r from-amber-500 to-orange-600">
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          AI智能导题
+                        </Button>
+                      </Link>
+                    </div>
+                    
+                    {customLibraries.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {customLibraries.map((library) => (
+                          <div key={library.id} className="relative group">
+                            <Button 
+                              variant="outline" 
+                              className="flex-col h-auto p-4 justify-start items-start text-left w-full"
+                              onClick={() => createCategoryPractice(library.name, true)}
+                              disabled={loading}
+                            >
+                              <div className="flex items-center w-full mb-2">
+                                <Database className="w-4 h-4 mr-2" />
+                                <span className="font-medium">{library.name}</span>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                包含 {library.count} 个题目
+                              </p>
+                            </Button>
+                            
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingLibrary(library.name);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>确认删除题库</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    您确定要删除题库"{library.name}"吗？这将删除该题库中的所有题目，此操作无法撤销。
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>取消</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    className="bg-red-500 hover:bg-red-600"
+                                    onClick={() => deleteLibrary(library.name)}
+                                  >
+                                    删除
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 border rounded-lg border-dashed">
+                        <Sparkles className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 mb-4">您还没有自定义题库</p>
+                        <Link href="/practice/generator">
+                          <Button className="bg-gradient-to-r from-amber-500 to-orange-600">
+                            <Plus className="mr-2 h-4 w-4" />
+                            创建自定义题库
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* 每日一练卡片 */}
@@ -342,87 +515,6 @@ export default function Practice() {
                   >
                     开始随机练习
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 专业题库区域 */}
-          <div className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BookOpen className="w-5 h-5 mr-2" />
-                  专业题库
-                </CardTitle>
-                <CardDescription>按学科分类的专业题目，由专业教师精心编写</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categories.map((category) => (
-                    <Button 
-                      key={category.name}
-                      variant="outline" 
-                      className="flex-col h-auto p-4 justify-start items-start text-left"
-                      onClick={() => createCategoryPractice(category.name)}
-                      disabled={loading}
-                    >
-                      <div className="flex items-center w-full mb-2">
-                        {category.icon}
-                        <span className="font-medium">{category.name}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">{category.description}</p>
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 自定义题库区域 */}
-          <div className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Database className="w-5 h-5 mr-2" />
-                  自定义题库
-                </CardTitle>
-                <CardDescription>您创建的个人题库，包含AI生成和自定义导入的题目</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {customLibraries.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {customLibraries.map((library) => (
-                      <Button 
-                        key={library.id}
-                        variant="outline" 
-                        className="flex-col h-auto p-4 justify-start items-start text-left"
-                        onClick={() => createCategoryPractice(library.name)}
-                        disabled={loading}
-                      >
-                        <div className="flex items-center w-full mb-2">
-                          <Database className="w-4 h-4 mr-2" />
-                          <span className="font-medium">{library.name}</span>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          包含 {library.count} 个题目
-                        </p>
-                      </Button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 border rounded-lg border-dashed">
-                    <p className="text-gray-500 mb-4">您还没有自定义题库</p>
-                  </div>
-                )}
-
-                <div className="mt-6 flex justify-center">
-                  <Link href="/practice/generator">
-                    <Button className="bg-gradient-to-r from-amber-500 to-orange-600">
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      AI智能导题
-                    </Button>
-                  </Link>
                 </div>
               </CardContent>
             </Card>

@@ -134,4 +134,60 @@ export async function GET(req: Request) {
       { status: 500 }
     )
   }
+}
+
+// 删除用户自定义题库
+export async function DELETE(req: Request) {
+  try {
+    // 验证用户是否已登录
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "未授权访问" },
+        { status: 401 }
+      )
+    }
+
+    // 获取用户ID
+    const userId = session.user.id
+
+    // 获取查询参数
+    const url = new URL(req.url)
+    const subject = url.searchParams.get("subject")
+    
+    if (!subject) {
+      return NextResponse.json(
+        { error: "缺少题库名称参数" },
+        { status: 400 }
+      )
+    }
+
+    // 连接数据库
+    await connectToDatabase()
+
+    // 删除指定科目的所有题目
+    const result = await CustomQuestion.deleteMany({ 
+      userId, 
+      subject 
+    })
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
+        { error: "未找到指定题库或题库为空" },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `已成功删除题库"${subject}"，共删除${result.deletedCount}道题目`,
+      deletedCount: result.deletedCount
+    })
+  } catch (error) {
+    console.error("删除题库失败:", error)
+    return NextResponse.json(
+      { error: "删除题库失败，请稍后重试" },
+      { status: 500 }
+    )
+  }
 } 

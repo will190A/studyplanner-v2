@@ -4,6 +4,23 @@ import { authOptions } from '@/lib/auth';
 import connect from '@/lib/db';
 import Question from '@/models/Question';
 import Mistake from '@/models/Mistake';
+import mongoose from 'mongoose';
+
+// 定义CustomQuestion模型
+const customQuestionSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  type: { type: String, required: true, enum: ["multiple_choice", "fill_blank", "short_answer"] },
+  content: { type: String, required: true },
+  options: [String],
+  answer: { type: String, required: true },
+  explanation: { type: String },
+  subject: { type: String, required: true, index: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+// 确保模型只被创建一次
+const CustomQuestion = mongoose.models.CustomQuestion || 
+  mongoose.model("CustomQuestion", customQuestionSchema);
 
 export async function POST(request: Request) {
   try {
@@ -29,16 +46,23 @@ export async function POST(request: Request) {
     
     await connect();
     
-    // 获取题目
-    const question = await Question.findById(questionId);
+    // 尝试从标准题库获取题目
+    let question = await Question.findById(questionId);
+    let isCustomQuestion = false;
     
+    // 如果在标准题库中找不到，尝试从自定义题库获取
     if (!question) {
-      return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+      question = await CustomQuestion.findById(questionId);
+      isCustomQuestion = true;
+      
+      if (!question) {
+        return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+      }
     }
     
     // 记录调试信息
     console.log('问题ID:', questionId);
-    console.log('问题类型:', question.type);
+    console.log('问题类型:', isCustomQuestion ? question.type : question.type);
     console.log('正确答案:', question.answer);
     console.log('用户答案:', userAnswer);
     console.log('正确答案类型:', typeof question.answer);
@@ -104,7 +128,7 @@ export async function POST(request: Request) {
         const mistake = new Mistake({
           userId,
           questionId: question._id,
-          category: question.category,
+          category: isCustomQuestion ? question.subject : question.category,
           wrongAnswer: userAnswer,
           status: 'unresolved'
         });
@@ -115,7 +139,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       isCorrect,
       correctAnswer: isCorrect ? null : question.answer,
-      explanation: question.explanation // 无论正确与否都返回解释
+      explanation: question.explanation || '暂无解析' // 无论正确与否都返回解释
     });
   } catch (error) {
     console.error('Error verifying answer:', error);

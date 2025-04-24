@@ -4,6 +4,23 @@ import { authOptions } from '@/lib/auth';
 import connect from '@/lib/db';
 import Practice from '@/models/Practice';
 import Question from '@/models/Question';
+import mongoose from 'mongoose';
+
+// 定义CustomQuestion模型
+const customQuestionSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  type: { type: String, required: true, enum: ["multiple_choice", "fill_blank", "short_answer"] },
+  content: { type: String, required: true },
+  options: [String],
+  answer: { type: String, required: true },
+  explanation: { type: String },
+  subject: { type: String, required: true, index: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+// 确保模型只被创建一次
+const CustomQuestion = mongoose.models.CustomQuestion || 
+  mongoose.model("CustomQuestion", customQuestionSchema);
 
 // 获取单个练习记录
 export async function GET(
@@ -28,9 +45,34 @@ export async function GET(
     
     // Get question details
     const questionIds = practice.questions.map(q => q.questionId);
-    const questions = await Question.find({ 
+    
+    // 从标准题库获取题目
+    const standardQuestions = await Question.find({ 
       _id: { $in: questionIds } 
     }).select('-answer -explanation');
+    
+    // 从自定义题库获取题目
+    const customQuestions = await CustomQuestion.find({
+      _id: { $in: questionIds }
+    }).select('-answer -explanation');
+    
+    // 合并题目信息
+    const questions = [
+      ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
+      ...customQuestions.map(q => ({ 
+        _id: q._id,
+        title: q.subject,
+        content: q.content,
+        type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
+        options: q.options ? q.options.map((opt, index) => ({
+          label: String.fromCharCode(65 + index), // A, B, C...
+          text: opt
+        })) : [],
+        difficulty: 'medium', // 默认难度
+        category: q.subject,
+        isCustom: true
+      }))
+    ];
     
     // Merge question information with practice record
     const questionsWithDetail = practice.questions.map(practiceQuestion => {
@@ -99,9 +141,26 @@ export async function PUT(
       
       // 获取所有题目的答案
       const questionIds = practice.questions.map(q => q.questionId);
-      const questions = await Question.find({ 
+      
+      // 从标准题库获取题目
+      const standardQuestions = await Question.find({ 
         _id: { $in: questionIds } 
       });
+      
+      // 从自定义题库获取题目
+      const customQuestions = await CustomQuestion.find({
+        _id: { $in: questionIds }
+      });
+      
+      // 合并题目信息
+      const questions = [
+        ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
+        ...customQuestions.map(q => ({ 
+          _id: q._id,
+          answer: q.answer,
+          isCustom: true
+        }))
+      ];
       
       let correctCount = 0;
       
