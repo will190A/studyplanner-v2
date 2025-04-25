@@ -5,6 +5,34 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Navbar from '@/components/Navbar'
 import { Loader2 } from 'lucide-react'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  RadialLinearScale,
+  ArcElement,
+  Filler
+} from 'chart.js'
+import { Line, Radar, Doughnut } from 'react-chartjs-2'
+
+// 注册 Chart.js 组件
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  RadialLinearScale,
+  ArcElement,
+  Filler
+)
 
 interface Reports {
   mastery: {
@@ -56,6 +84,72 @@ export default function Reports() {
       setError('获取数据失败，请重试')
       setLoading(false)
     }
+  }
+
+  // 准备雷达图数据
+  const radarData = {
+    labels: reports?.mastery.map(item => item.category) || [],
+    datasets: [
+      {
+        label: '掌握程度',
+        data: reports?.mastery.map(item => item.accuracy) || [],
+        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 2,
+        pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: 'rgba(54, 162, 235, 1)'
+      }
+    ]
+  }
+
+  // 准备趋势图数据
+  const trendData = {
+    labels: reports?.trend.map(item => new Date(item.date).toLocaleDateString()) || [],
+    datasets: [
+      {
+        label: '练习数量',
+        data: reports?.trend.map(item => item.count) || [],
+        borderColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        tension: 0.4
+      },
+      {
+        label: '正确率',
+        data: reports?.trend.map(item => item.accuracy) || [],
+        borderColor: 'rgba(255, 99, 132, 1)',
+        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+        tension: 0.4
+      }
+    ]
+  }
+
+  // 准备知识点分布图数据
+  const distributionData = {
+    labels: reports?.mastery.map(item => item.category) || [],
+    datasets: [
+      {
+        data: reports?.mastery.map(item => item.accuracy) || [],
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.6)',
+          'rgba(54, 162, 235, 0.6)',
+          'rgba(255, 206, 86, 0.6)',
+          'rgba(75, 192, 192, 0.6)',
+          'rgba(153, 102, 255, 0.6)',
+          'rgba(255, 159, 64, 0.6)'
+        ],
+        borderColor: [
+          'rgba(255, 99, 132, 1)',
+          'rgba(54, 162, 235, 1)',
+          'rgba(255, 206, 86, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(153, 102, 255, 1)',
+          'rgba(255, 159, 64, 1)'
+        ],
+        borderWidth: 1
+      }
+    ]
   }
 
   if (loading) {
@@ -115,23 +209,26 @@ export default function Reports() {
                 <CardTitle>掌握程度</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {reports?.mastery.map((item) => (
-                    <div key={item.category} className="flex items-center justify-between">
-                      <span className="text-gray-600">{item.category}</span>
-                      <div className="flex items-center">
-                        <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
-                          <div 
-                            className="h-full bg-blue-600 rounded-full"
-                            style={{ width: `${item.accuracy}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">
-                          {item.accuracy.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-80">
+                  <Radar 
+                    data={radarData}
+                    options={{
+                      scales: {
+                        r: {
+                          angleLines: {
+                            display: true
+                          },
+                          suggestedMin: 0,
+                          suggestedMax: 100
+                        }
+                      },
+                      plugins: {
+                        legend: {
+                          position: 'top' as const
+                        }
+                      }
+                    }}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -141,25 +238,23 @@ export default function Reports() {
                 <CardTitle>练习趋势</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {reports?.trend.map((item) => (
-                    <div key={item.date} className="flex items-center justify-between">
-                      <span className="text-gray-600">
-                        {new Date(item.date).toLocaleDateString()}
-                      </span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-500">
-                          {item.count} 题
-                        </span>
-                        <span className="text-sm font-medium">
-                          {item.accuracy.toFixed(1)}%
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {Math.round(item.time / 60)} 分钟
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-80">
+                  <Line 
+                    data={trendData}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: {
+                          position: 'top' as const
+                        }
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true
+                        }
+                      }
+                    }}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -192,23 +287,18 @@ export default function Reports() {
                 <CardTitle>知识点分布</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {reports?.mastery.map((item) => (
-                    <div key={item.category} className="flex items-center justify-between">
-                      <span className="text-gray-600">{item.category}</span>
-                      <div className="flex items-center">
-                        <div className="w-32 h-2 bg-gray-200 rounded-full mr-2">
-                          <div 
-                            className="h-full bg-purple-600 rounded-full"
-                            style={{ width: `${item.accuracy}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">
-                          {item.accuracy.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-80 flex items-center justify-center">
+                  <Doughnut 
+                    data={distributionData}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: {
+                          position: 'right' as const
+                        }
+                      }
+                    }}
+                  />
                 </div>
               </CardContent>
             </Card>
