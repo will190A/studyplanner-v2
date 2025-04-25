@@ -16,9 +16,10 @@ import {
   Legend,
   RadialLinearScale,
   ArcElement,
-  Filler
+  Filler,
+  BarElement
 } from 'chart.js'
-import { Line, Radar, Doughnut } from 'react-chartjs-2'
+import { Line, Radar, Doughnut, Bar } from 'react-chartjs-2'
 
 // 注册 Chart.js 组件
 ChartJS.register(
@@ -31,7 +32,8 @@ ChartJS.register(
   Legend,
   RadialLinearScale,
   ArcElement,
-  Filler
+  Filler,
+  BarElement
 )
 
 interface Reports {
@@ -152,6 +154,20 @@ export default function Reports() {
     ]
   }
 
+  // 准备薄弱点排名图数据
+  const weakPointsData = {
+    labels: reports?.weakPoints.map(item => item.category) || [],
+    datasets: [
+      {
+        label: '正确率',
+        data: reports?.weakPoints.map(item => item.accuracy) || [],
+        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        borderWidth: 1
+      }
+    ]
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -266,18 +282,35 @@ export default function Reports() {
                 <CardTitle>薄弱点排名</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {reports?.weakPoints.map((item) => (
-                    <div key={item.category} className="flex items-center justify-between p-4 bg-white rounded-lg border">
-                      <div>
-                        <h3 className="font-medium">{item.category}</h3>
-                        <p className="text-sm text-gray-500">需要加强</p>
-                      </div>
-                      <span className="text-red-500 font-medium">
-                        正确率: {item.accuracy.toFixed(1)}%
-                      </span>
-                    </div>
-                  ))}
+                <div className="h-80">
+                  <Bar 
+                    data={weakPointsData}
+                    options={{
+                      indexAxis: 'y' as const,
+                      plugins: {
+                        legend: {
+                          display: false
+                        },
+                        tooltip: {
+                          callbacks: {
+                            label: function(context) {
+                              return `正确率: ${context.raw}%`;
+                            }
+                          }
+                        }
+                      },
+                      scales: {
+                        x: {
+                          beginAtZero: true,
+                          max: 100,
+                          title: {
+                            display: true,
+                            text: '正确率 (%)'
+                          }
+                        }
+                      }
+                    }}
+                  />
                 </div>
               </CardContent>
             </Card>
