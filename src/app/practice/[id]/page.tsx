@@ -63,14 +63,12 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   const [startTime] = useState(new Date())
   const [elapsedTime, setElapsedTime] = useState(0)
   
-  // 获取当前用户ID - 如果已登录则使用实际ID，否则使用默认ID
+  // 获取当前用户ID - 如果已登录则使用实际ID，否则返回null
   const getUserId = () => {
-    // 优先使用session中的用户ID
     if (session?.user && 'id' in session.user) {
       return session.user.id as string;
     }
-    // 没有session时使用默认ID
-    return '6804c5d6112eb76d7c0ec957';
+    return null;  // 未登录时返回 null
   };
   
   // 格式化时间

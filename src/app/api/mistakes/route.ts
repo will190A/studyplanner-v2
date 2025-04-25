@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import connect from '@/lib/db';
 import Mistake from '@/models/Mistake';
 import Question from '@/models/Question';
+import CustomQuestion from '@/models/CustomQuestion';
 
 // 获取用户错题列表
 export async function GET(request: Request) {
@@ -45,15 +46,47 @@ export async function GET(request: Request) {
       
     // 获取题目详情
     const questionIds = mistakes.map(mistake => mistake.questionId);
-    const questions = await Question.find({ 
+    
+    // 分别获取标准题目和自定义题目
+    const standardQuestions = await Question.find({ 
       _id: { $in: questionIds } 
+    });
+    
+    const customQuestions = await CustomQuestion.find({
+      _id: { $in: questionIds }
     });
     
     // 将题目信息与错题记录合并
     const mistakesWithQuestions = mistakes.map(mistake => {
-      const question = questions.find(q => 
-        q._id.toString() === mistake.questionId.toString()
-      );
+      let question = null;
+      
+      if (mistake.isCustom) {
+        // 查找自定义题目
+        const customQuestion = customQuestions.find(q => 
+          q._id.toString() === mistake.questionId.toString()
+        );
+        
+        if (customQuestion) {
+          question = {
+            _id: customQuestion._id,
+            title: customQuestion.subject,
+            content: customQuestion.content,
+            type: customQuestion.type === 'multiple_choice' ? 'choice' : 
+                  customQuestion.type === 'fill_blank' ? 'fill' : 'short_answer',
+            options: customQuestion.options ? customQuestion.options.map((opt, index) => ({
+              label: String.fromCharCode(65 + index),
+              text: opt
+            })) : [],
+            difficulty: 'medium',
+            category: customQuestion.subject
+          };
+        }
+      } else {
+        // 查找标准题目
+        question = standardQuestions.find(q => 
+          q._id.toString() === mistake.questionId.toString()
+        );
+      }
       
       return {
         ...mistake.toObject(),

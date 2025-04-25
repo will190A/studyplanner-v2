@@ -125,7 +125,9 @@ export default function Practice() {
       const response = await fetch(`/api/mistakes?userId=${userId}&status=unresolved,reviewing`);
       if (response.ok) {
         const data = await response.json();
-        setMistakeCount(data.pagination?.total || 0);
+        // 过滤掉已删除的题目
+        const validMistakes = data.mistakes.filter((mistake: any) => mistake.question);
+        setMistakeCount(validMistakes.length);
       }
     } catch (error) {
       console.error('获取错题数量失败:', error);

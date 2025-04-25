@@ -9,6 +9,7 @@ export interface IMistake extends Document {
   lastWrongDate: Date;
   notes?: string;
   status: 'unresolved' | 'reviewing' | 'resolved';
+  isCustom: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,9 +28,19 @@ const MistakeSchema: Schema = new Schema({
     enum: ['unresolved', 'reviewing', 'resolved'],
     default: 'unresolved'
   },
+  isCustom: { type: Boolean, required: true, default: false },
 }, { timestamps: true });
 
-// 创建复合索引，确保每个用户的每个问题只有一个错题记录
-MistakeSchema.index({ userId: 1, questionId: 1 }, { unique: true });
+// 删除旧的索引
+MistakeSchema.index({ userId: 1, questionId: 1 }, { unique: false, sparse: true });
 
-export default mongoose.models.Mistake || mongoose.model<IMistake>('Mistake', MistakeSchema); 
+// 创建新的复合索引，确保每个用户的每个题目（区分标准题和自定义题）只有一条错题记录
+MistakeSchema.index({ userId: 1, questionId: 1, isCustom: 1 }, { unique: true });
+
+// 获取模型实例
+const MistakeModel = mongoose.models.Mistake || mongoose.model<IMistake>('Mistake', MistakeSchema);
+
+// 确保索引被正确创建
+MistakeModel.syncIndexes();
+
+export default MistakeModel; 
