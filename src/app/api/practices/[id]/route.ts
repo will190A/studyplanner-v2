@@ -184,7 +184,7 @@ export async function PUT(
       let correctCount = 0;
       
       // 更新每道题的答案和是否正确
-      practice.questions = practice.questions.map(practiceQuestion => {
+      practice.questions = practice.questions.map((practiceQuestion: PracticeQuestion) => {
         const questionId = practiceQuestion.questionId.toString();
         const answerInfo = answers.find(a => a.questionId === questionId);
         
