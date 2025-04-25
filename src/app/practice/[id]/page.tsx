@@ -9,7 +9,7 @@ import QuestionCard from '@/components/QuestionCard'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowLeft, Clock, Check } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { toast } from '@/components/ui/use-toast'
+import { useToast } from "@/components/ui/use-toast"
 
 interface Question {
   _id: string
@@ -46,6 +46,7 @@ interface Practice {
 export default function PracticePage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const { data: session } = useSession()
+  const { toast } = useToast()
   const [practice, setPractice] = useState<Practice | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
@@ -230,10 +231,13 @@ export default function PracticePage({ params }: { params: { id: string } }) {
       // 获取当前用户ID
       const userId = getUserId();
       
+      console.log(`验证答案 - 题目ID: ${questionId}, 用户答案:`, answer);
+      
       const response = await fetch('/api/questions/verify', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.user?.id || ''}`
         },
         body: JSON.stringify({
           questionId,
@@ -243,180 +247,233 @@ export default function PracticePage({ params }: { params: { id: string } }) {
       })
       
       if (!response.ok) {
+        if (response.status === 401) {
+          toast({
+            title: "验证失败",
+            description: "请先登录后再进行练习",
+            variant: "destructive"
+          })
+          return false
+        }
         throw new Error('验证答案失败')
       }
       
       const data = await response.json()
+      console.log('验证答案返回数据:', data);
       
       // 更新问题结果状态
-      setQuestionResults(prev => ({
-        ...prev,
-        [questionId]: data.isCorrect
-      }))
+      const isCorrect = data.isCorrect;
+      setQuestionResults(prev => {
+        const newResults = {
+          ...prev,
+          [questionId]: isCorrect
+        };
+        console.log('更新问题结果:', {
+          questionId,
+          isCorrect,
+          allResults: newResults,
+          totalQuestions: questions.length,
+          correctCount: Object.values(newResults).filter(result => result).length
+        });
+        return newResults;
+      });
       
       // 更新正确答案和解析
-      if (!data.isCorrect) {
-        setCorrectAnswers(prev => ({
-          ...prev,
-          [questionId]: data.correctAnswer
-        }))
-        
-        setExplanations(prev => ({
-          ...prev,
-          [questionId]: data.explanation
-        }))
-      } else {
-        setExplanations(prev => ({
-          ...prev,
-          [questionId]: data.explanation
-        }))
-      }
+      setCorrectAnswers(prev => ({
+        ...prev,
+        [questionId]: data.correctAnswer
+      }));
+      
+      setExplanations(prev => ({
+        ...prev,
+        [questionId]: data.explanation
+      }));
       
       // 标记为已揭示
       setRevealedAnswers(prev => ({
         ...prev,
         [questionId]: true
-      }))
+      }));
       
       // 立即更新错题状态
-      const mistakeResponse = await fetch('/api/mistakes/batch-update', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          updates: [{
-            questionId,
-            status: data.isCorrect ? 'resolved' : 'reviewing'
-          }]
-        })
-      });
-      
-      if (!mistakeResponse.ok) {
-        console.error('Failed to update mistake status');
-      } else {
-        const mistakeData = await mistakeResponse.json();
-        console.log('错题状态更新结果:', mistakeData);
+      if (userId) {
+        const mistakeResponse = await fetch('/api/mistakes/batch-update', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userId}`
+          },
+          body: JSON.stringify({
+            updates: [{
+              questionId,
+              status: isCorrect ? 'resolved' : 'reviewing'
+            }]
+          })
+        });
+        
+        if (!mistakeResponse.ok) {
+          console.error('Failed to update mistake status');
+        } else {
+          const mistakeData = await mistakeResponse.json();
+          console.log('错题状态更新结果:', mistakeData);
+        }
       }
       
-      return data.isCorrect
+      return isCorrect;
     } catch (error) {
       console.error('Error verifying answer:', error)
+      toast({
+        title: "验证失败",
+        description: "请重试",
+        variant: "destructive"
+      })
       return false
     }
   }
   
-  // 提交整个练习
+  // 提交练习结果
   const submitPractice = async () => {
-    if (!practice) return
-    
     try {
-      setIsSubmitting(true)
+      setIsSubmitting(true);
       
-      // 预先设置isCompleted，立即停止计时器
-      setIsCompleted(true)
+      // 收集所有题目的结果，确保每个题目都有结果
+      const finalQuestionResults = { ...questionResults };
       
-      // 记录提交时的持续时间
-      const finalDuration = Math.floor((new Date().getTime() - startTime.getTime()) / 1000)
-      setElapsedTime(finalDuration)
-      
-      // 获取当前用户ID
-      const userId = getUserId();
-      
-      // 提交所有答案
-      const response = await fetch(`/api/practices/${practice._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          answers,
-          userId
-        })
-      })
-      
-      if (!response.ok) {
-        throw new Error('提交练习失败')
-      }
-      
-      const data = await response.json()
-      setPractice(data.practice)
-      
-      // 从服务器获取所有正确答案和解析
+      // 检查是否每个题目都有答案
       for (const question of questions) {
-        if (!revealedAnswers[question._id]) {
-          try {
-            const answerResponse = await fetch(`/api/questions/${question._id}?showAnswer=true`)
-            
-            if (answerResponse.ok) {
-              const questionData = await answerResponse.json()
-              
-              setCorrectAnswers(prev => ({
-                ...prev,
-                [question._id]: questionData.answer
-              }))
-              
-              setExplanations(prev => ({
-                ...prev,
-                [question._id]: questionData.explanation
-              }))
-              
-              // 设置所有答案为已揭示
-              setRevealedAnswers(prev => ({
-                ...prev,
-                [question._id]: true
-              }))
+        const questionId = question._id;
+        
+        // 如果题目没有结果，但有答案，先验证
+        if (finalQuestionResults[questionId] === undefined && answers[questionId] !== undefined) {
+          console.log(`题目 ${questionId} 没有结果但有答案，进行验证`);
+          
+          // 构造问题结果
+          const answer = answers[questionId];
+          if (question.type === 'judge' || question.type === 'choice') {
+            // 对于简单类型题目，与正确答案比较
+            if (correctAnswers[questionId] !== undefined) {
+              const isCorrect = correctAnswers[questionId] === answer;
+              finalQuestionResults[questionId] = isCorrect;
+              console.log(`题目 ${questionId} 直接比较结果:`, isCorrect);
             }
-          } catch (error) {
-            console.error(`Error fetching answer for question ${question._id}:`, error)
+          } else if (selfJudgments[questionId] !== undefined) {
+            // 使用自我判断结果
+            finalQuestionResults[questionId] = selfJudgments[questionId];
+            console.log(`题目 ${questionId} 使用自我判断结果:`, selfJudgments[questionId]);
+          } else {
+            // 默认为错误
+            finalQuestionResults[questionId] = false;
+            console.log(`题目 ${questionId} 没有结果或自我判断，默认为错误`);
           }
         }
       }
       
-      // 更新错题状态
-      const mistakeUpdates = questions.map(question => {
-        const isCorrect = questionResults[question._id];
-        return {
-          questionId: question._id,
-          status: isCorrect ? 'resolved' : 'reviewing'
-        };
+      // 计算正确率
+      const totalQuestions = questions.length;
+      const correctCount = Object.values(finalQuestionResults).filter(result => result).length;
+      const correctRate = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+      
+      console.log('提交练习最终结果:', {
+        totalQuestions,
+        correctCount,
+        correctRate,
+        allResults: finalQuestionResults,
+        originalResults: questionResults
       });
       
-      // 批量更新错题状态
-      const mistakeResponse = await fetch('/api/mistakes/batch-update', {
+      // 获取当前用户ID
+      const userId = getUserId();
+      
+      // 转换答案格式 - 从对象映射转为数组格式
+      const answersArray = Object.entries(answers).map(([questionId, answer]) => ({
+        questionId,
+        answer,
+        isCorrect: finalQuestionResults[questionId] || false
+      }));
+      
+      console.log('转换后的答案数组:', answersArray);
+      
+      // 更新练习记录
+      const response = await fetch(`/api/practices/${params.id}`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`
         },
         body: JSON.stringify({
-          updates: mistakeUpdates
+          completed: true,
+          correctCount,
+          accuracy: correctRate,
+          timeCompleted: new Date().toISOString(),
+          answers: answersArray
         })
       });
       
-      if (!mistakeResponse.ok) {
-        console.error('Failed to update mistake statuses');
-      } else {
-        const mistakeData = await mistakeResponse.json();
-        console.log('错题状态更新结果:', mistakeData);
+      if (!response.ok) {
+        throw new Error('提交练习结果失败')
       }
       
-      // 显示完成提示
-      const accuracy = (Object.values(questionResults).filter(result => result).length / questions.length) * 100;
+      const data = await response.json()
+      console.log('提交练习记录返回:', data);
+      
+      // 更新本地结果状态
+      setQuestionResults(finalQuestionResults);
+      
       toast({
-        title: "练习完成",
-        description: `正确率: ${accuracy.toFixed(1)}%`,
+        title: "练习完成！",
+        description: `正确率: ${correctRate.toFixed(1)}% (${correctCount}/${totalQuestions})`,
+        variant: "default"
       })
       
-      // 3秒后跳转到练习列表
-      setTimeout(() => {
-        router.push('/practice')
-      }, 3000)
+      // 更新练习状态
+      setPractice(prev => ({
+        ...prev!,
+        completed: true,
+        correctCount,
+        accuracy: correctRate,
+        timeCompleted: new Date().toISOString()
+      }));
+      setIsCompleted(true);
       
-      setIsSubmitting(false)
+      // 更新所有问题的答案显示状态
+      const newRevealedAnswers = questions.reduce((acc, question) => {
+        acc[question._id] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setRevealedAnswers(newRevealedAnswers);
+      
+      // 如果用户已登录，更新错题状态
+      if (userId) {
+        const mistakeUpdates = questions.map(question => ({
+          questionId: question._id,
+          status: finalQuestionResults[question._id] ? 'resolved' : 'reviewing'
+        }));
+        
+        const mistakeResponse = await fetch('/api/mistakes/batch-update', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userId}`
+          },
+          body: JSON.stringify({
+            updates: mistakeUpdates
+          })
+        });
+        
+        if (!mistakeResponse.ok) {
+          console.error('Failed to update mistake statuses');
+        }
+      }
+      
     } catch (error) {
       console.error('Error submitting practice:', error)
-      setError('提交练习失败，请重试')
-      setIsSubmitting(false)
+      toast({
+        title: "提交失败",
+        description: "请重试",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmitting(false);
     }
   }
   

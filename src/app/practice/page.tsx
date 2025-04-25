@@ -38,6 +38,18 @@ interface LibraryResponse {
   subjects: string[];
 }
 
+interface Practice {
+  _id: string;
+  title: string;
+  type: 'daily' | 'category' | 'review' | 'random';
+  category?: string;
+  timeStarted: string;
+  completed: boolean;
+  accuracy: number;
+  correctCount: number;
+  totalQuestions: number;
+}
+
 export default function Practice() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -45,7 +57,7 @@ export default function Practice() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [recentPractices, setRecentPractices] = useState<any[]>([]);
+  const [recentPractices, setRecentPractices] = useState<Practice[]>([]);
   const [mistakeCount, setMistakeCount] = useState(0);
   const [customLibraries, setCustomLibraries] = useState<any[]>([]);
   const [deletingLibrary, setDeletingLibrary] = useState<string | null>(null);
@@ -93,29 +105,19 @@ export default function Practice() {
         console.log('获取最近练习数据:', data);
         
         if (data && Array.isArray(data.practices) && data.practices.length > 0) {
-          setRecentPractices(data.practices);
-          console.log('设置最近练习数据,数量:', data.practices.length);
+          // 确保每个练习记录都有正确的正确率
+          const processedPractices = data.practices.map((practice: Practice) => ({
+            ...practice,
+            accuracy: practice.completed ? 
+              (practice.correctCount / practice.totalQuestions * 100) : 0
+          }));
+          
+          setRecentPractices(processedPractices);
+          console.log('设置最近练习数据,数量:', processedPractices.length);
+          console.log('处理后的练习数据:', processedPractices);
         } else {
           console.error('获取最近练习数据为空或格式不正确:', data);
-          // 创建一个测试练习记录用于显示
-          const demoData = [{
-            _id: 'demo1',
-            title: '算法专项练习',
-            type: 'category',
-            category: '算法',
-            timeStarted: new Date().toISOString(),
-            completed: true,
-            accuracy: 85.5
-          }, {
-            _id: 'demo2',
-            title: '数据结构专项练习',
-            type: 'category',
-            category: '数据结构',
-            timeStarted: new Date(Date.now() - 86400000).toISOString(),
-            completed: true,
-            accuracy: 92.0
-          }];
-          setRecentPractices(demoData);
+          setRecentPractices([]);
         }
       } else {
         console.error('获取最近练习失败，状态码:', response.status);
@@ -587,7 +589,7 @@ export default function Practice() {
                         </div>
                         {practice.completed ? (
                           <span className="text-xs font-medium px-2 py-0.5 rounded bg-green-100 text-green-800 whitespace-nowrap">
-                            正确率: {practice.accuracy.toFixed(1)}%
+                            正确率: {practice.accuracy ? practice.accuracy.toFixed(1) : '0.0'}%
                           </span>
                         ) : (
                           <span className="text-xs font-medium px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 whitespace-nowrap">

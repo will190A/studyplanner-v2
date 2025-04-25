@@ -162,75 +162,93 @@ export async function PUT(
         }))
       ];
       
+      console.log('更新练习 - 原始数据:', {
+        practiceId: id,
+        answers,
+        questionsInDb: questions.length,
+        userAnswers: Object.keys(answers).length
+      });
+      
+      // 使用客户端提供的结果
       let correctCount = 0;
       
       // 更新每道题的答案和是否正确
       practice.questions = practice.questions.map(practiceQuestion => {
         const questionId = practiceQuestion.questionId.toString();
-        if (!answers[questionId]) return practiceQuestion;
+        const answerInfo = answers.find(a => a.questionId === questionId);
         
-        const question = questions.find(q => q._id.toString() === questionId);
-        if (!question) return practiceQuestion;
-        
-        // 检查答案是否正确
-        let isCorrect = false;
-        const userAnswer = answers[questionId];
-        
-        if (question.type === 'short_answer') {
-          // 简答题总是返回正确，让用户自己比对
-          isCorrect = true;
-        } else if (Array.isArray(question.answer)) {
-          // 多选题
-          if (Array.isArray(userAnswer)) {
-            // 排序两个数组，确保顺序不同但内容相同的答案也能被判定为正确
-            const sortedCorrectAnswer = [...question.answer].sort();
-            const sortedUserAnswer = [...userAnswer].sort();
-            
-            // 检查长度是否相同
-            if (sortedCorrectAnswer.length === sortedUserAnswer.length) {
-              // 检查每个元素是否相同
-              isCorrect = sortedCorrectAnswer.every((ans, index) => ans === sortedUserAnswer[index]);
-            }
-          }
-        } else {
-          // 单选题、判断题、填空题或编程题
-          isCorrect = question.answer === userAnswer;
-          
-          // 如果不相等，尝试更宽松的比较
-          if (!isCorrect) {
-            console.log('严格比较不相等，尝试更宽松比较');
-            isCorrect = String(question.answer).trim() === String(userAnswer).trim();
-          }
+        if (!answerInfo) {
+          return practiceQuestion;
         }
         
-        if (isCorrect) correctCount++;
+        // 使用客户端提供的正确性结果
+        const isCorrect = answerInfo.isCorrect;
+        
+        // 更新正确题目计数
+        if (isCorrect) {
+          correctCount++;
+        }
+        
+        console.log(`题目 ${questionId} 结果:`, {
+          userAnswer: answerInfo.answer,
+          isCorrect: isCorrect
+        });
         
         return {
           ...practiceQuestion.toObject(),
           isCorrect,
-          userAnswer
+          userAnswer: answerInfo.answer
         };
       });
       
       // 更新练习记录
       practice.correctCount = correctCount;
-      practice.accuracy = (correctCount / practice.totalQuestions) * 100;
+      practice.accuracy = data.accuracy || (correctCount / practice.totalQuestions) * 100;
       practice.timeCompleted = new Date();
       practice.completed = true;
+      
+      // 打印调试信息
+      console.log('练习更新信息:', {
+        totalQuestions: practice.totalQuestions,
+        correctCount,
+        accuracy: practice.accuracy
+      });
     } else if (data.status === 'completed') {
       // 手动完成练习
       practice.timeCompleted = new Date();
       practice.completed = true;
+    } else if (data.completed !== undefined) {
+      // 直接从客户端更新练习状态
+      practice.completed = data.completed;
+      
+      if (data.correctCount !== undefined) {
+        practice.correctCount = data.correctCount;
+      }
+      
+      if (data.accuracy !== undefined) {
+        practice.accuracy = data.accuracy;
+      }
+      
+      if (data.timeCompleted) {
+        practice.timeCompleted = new Date(data.timeCompleted);
+      }
     }
     
     await practice.save();
     
+    // 确保返回的数据包含正确的正确率
+    const updatedPractice = await Practice.findById(practice._id);
+    
     return NextResponse.json({
       message: 'Practice updated successfully',
-      practice
+      practice: {
+        ...updatedPractice.toObject(),
+        correctCount: updatedPractice.correctCount,
+        accuracy: updatedPractice.accuracy
+      }
     });
   } catch (error) {
     console.error('Error updating practice:', error);
-    return NextResponse.json({ error: 'Failed to fetch practice' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update practice' }, { status: 500 });
   }
 } 
