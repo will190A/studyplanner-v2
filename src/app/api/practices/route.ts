@@ -155,14 +155,10 @@ export async function POST(request: Request) {
             explanation: q.explanation || '暂无解析'
           }));
         } else {
-          // 从标准题库中获取题目
+          // 从专业题库中获取题目
           questions = await Question.find({ category })
-            .select('-answer -explanation')
-            .limit(count);
-            
-          if (questions.length === 0) {
-            return NextResponse.json({ error: '未找到相关题目' }, { status: 404 });
-          }
+            .limit(count)
+            .lean();
         }
         break;
         
@@ -233,11 +229,39 @@ export async function POST(request: Request) {
         break;
         
       case 'random':
-        // 随机练习：随机选择题目
-        questions = await Question.aggregate([
-          { $sample: { size: count } },
-          { $project: { answer: 0, explanation: 0 } }
-        ]);
+        // 随机练习：从所有题库中随机选择题目
+        // 获取用户的自定义题库
+        const customQuestions = await CustomQuestion.find({ userId });
+        
+        // 获取专业题库
+        const standardQuestions = await Question.find();
+        
+        // 合并所有可用题目
+        const allQuestions = [
+          ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
+          ...customQuestions.map(q => ({ 
+            _id: q._id,
+            title: q.subject,
+            content: q.content,
+            type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
+            options: q.options ? q.options.map((opt, index) => ({
+              label: String.fromCharCode(65 + index),
+              text: opt
+            })) : [],
+            answer: q.answer,
+            explanation: q.explanation || '暂无解析',
+            isCustom: true
+          }))
+        ];
+
+        if (allQuestions.length === 0) {
+          return NextResponse.json({ error: 'No questions available' }, { status: 404 });
+        }
+
+        // 随机选择题目
+        questions = allQuestions
+          .sort(() => Math.random() - 0.5)
+          .slice(0, count);
         break;
         
       default:

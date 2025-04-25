@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import connect from '@/lib/db';
 import Question from '@/models/Question';
 import Practice from '@/models/Practice';
+import CustomQuestion from '@/models/CustomQuestion';
 
 // 获取或创建今日练习
 export async function GET(request: Request) {
@@ -31,24 +32,48 @@ export async function GET(request: Request) {
 
     // 如果今天还没有练习记录，创建新的练习
     if (!practice) {
-      // 获取随机题目
-      const questions = await Question.aggregate([
-        { $sample: { size: 5 } }
-      ]);
+      // 获取用户的自定义题库
+      const customQuestions = await CustomQuestion.find({ userId });
+      
+      // 获取专业题库
+      const standardQuestions = await Question.find();
+      
+      // 合并所有可用题目
+      const allQuestions = [
+        ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
+        ...customQuestions.map(q => ({ 
+          _id: q._id,
+          title: q.subject,
+          content: q.content,
+          type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
+          options: q.options ? q.options.map((opt, index) => ({
+            label: String.fromCharCode(65 + index),
+            text: opt
+          })) : [],
+          answer: q.answer,
+          explanation: q.explanation || '暂无解析',
+          isCustom: true
+        }))
+      ];
 
-      if (!questions || questions.length === 0) {
+      if (allQuestions.length === 0) {
         return new Response(JSON.stringify({ error: 'No questions available' }), { status: 404 });
       }
+
+      // 随机选择5道题目
+      const selectedQuestions = allQuestions
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 5);
 
       const newPractice = await Practice.create({
         userId,
         type: 'daily',
         title: `每日一练 - ${new Date().toLocaleDateString('zh-CN')}`,
-        questions: questions.map(q => ({
+        questions: selectedQuestions.map(q => ({
           questionId: q._id,
           isCorrect: false
         })),
-        totalQuestions: questions.length,
+        totalQuestions: selectedQuestions.length,
         correctCount: 0,
         accuracy: 0,
         timeStarted: new Date(),
@@ -58,7 +83,10 @@ export async function GET(request: Request) {
       await newPractice.populate('questions');
       
       return new Response(JSON.stringify({
-        practice: newPractice,
+        practice: {
+          ...newPractice.toObject(),
+          questions: selectedQuestions
+        },
         completed: false
       }));
     }
