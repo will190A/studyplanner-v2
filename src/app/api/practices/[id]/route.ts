@@ -70,7 +70,7 @@ export async function GET(
         console.error('Invalid questionId:', q.questionId);
         return null;
       }
-    }).filter(id => id !== null);
+    }).filter((id: mongoose.Types.ObjectId | null): id is mongoose.Types.ObjectId => id !== null);
     
     console.log('查询的题目ID列表:', questionIds);
     
