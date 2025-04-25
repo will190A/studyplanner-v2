@@ -178,7 +178,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           setQuestionResults(questionResultsData);
           
           // 从服务器获取正确答案和解析
-          await Promise.all(questionIds.map(async (questionId) => {
+          await Promise.all(questionIds.map(async (questionId: string) => {
             try {
               const answerResponse = await fetch(`/api/questions/${questionId}?showAnswer=true`);
               
