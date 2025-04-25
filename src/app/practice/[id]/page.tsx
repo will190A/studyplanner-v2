@@ -111,25 +111,38 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         // 获取当前用户ID
         const userId = getUserId();
         
-        const response = await fetch(`/api/practices/${params.id}?userId=${userId}`)
+        // 检查是否从错题本页面进入
+        const isFromMistakes = sessionStorage.getItem('fromMistakes') === 'true';
+        
+        const response = await fetch(`/api/practices/${params.id}${userId ? `?userId=${userId}` : ''}`);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch practice')
+          throw new Error('Failed to fetch practice');
         }
         
-        const data = await response.json()
-        console.log('获取到练习数据:', data)
-        setPractice(data)
+        const data = await response.json();
+        console.log('获取到练习数据:', data);
+        
+        if (!data || !data._id) {
+          throw new Error('Invalid practice data received');
+        }
+        
+        setPractice(data);
         
         // 获取所有题目
         const practiceQuestions = data.questions
           .map((q: PracticeQuestion) => q.questionDetail)
           .filter((q): q is Question => q !== null && q !== undefined);
-        setQuestions(practiceQuestions)
+        
+        if (practiceQuestions.length === 0) {
+          throw new Error('No questions found in practice');
+        }
+        
+        setQuestions(practiceQuestions);
         
         // 如果练习已完成，获取所有的答案和解析并停止计时
         if (data.completed) {
-          setIsCompleted(true)
+          setIsCompleted(true);
           
           // 设置最终时间
           if (data.timeCompleted && data.timeStarted) {
@@ -140,66 +153,64 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           }
           
           // 获取所有题目的正确答案和解析
-          const questionIds = practiceQuestions.map((q: Question) => q._id)
+          const questionIds = practiceQuestions.map((q: Question) => q._id);
           
-          const answersData: Record<string, string | string[]> = {}
-          const explanationsData: Record<string, string> = {}
-          const questionResultsData: Record<string, boolean> = {}
+          const answersData: Record<string, string | string[]> = {};
+          const explanationsData: Record<string, string> = {};
+          const questionResultsData: Record<string, boolean> = {};
           
           // 获取用户的答案和题目结果
-          const userAnswers: Record<string, string | string[]> = {}
+          const userAnswers: Record<string, string | string[]> = {};
           data.questions.forEach((q: PracticeQuestion) => {
             if (q.userAnswer) {
-              userAnswers[q.questionId] = q.userAnswer
-              
-              // 重要：保存题目的正确/错误状态
-              questionResultsData[q.questionId] = q.isCorrect
-              console.log(`题目${q.questionId}实际状态:`, q.isCorrect)
+              userAnswers[q.questionId] = q.userAnswer;
+              questionResultsData[q.questionId] = q.isCorrect;
+              console.log(`题目${q.questionId}实际状态:`, q.isCorrect);
             }
-          })
+          });
           
-          console.log('从服务器获取的用户答案:', userAnswers)
-          console.log('从服务器获取的题目结果:', questionResultsData)
+          console.log('从服务器获取的用户答案:', userAnswers);
+          console.log('从服务器获取的题目结果:', questionResultsData);
           
           // 设置答案和题目结果状态
-          setAnswers(userAnswers)
-          setQuestionResults(questionResultsData)
+          setAnswers(userAnswers);
+          setQuestionResults(questionResultsData);
           
           // 从服务器获取正确答案和解析
-          for (const questionId of questionIds) {
+          await Promise.all(questionIds.map(async (questionId) => {
             try {
-              const answerResponse = await fetch(`/api/questions/${questionId}?showAnswer=true`)
+              const answerResponse = await fetch(`/api/questions/${questionId}?showAnswer=true`);
               
               if (answerResponse.ok) {
-                const questionData = await answerResponse.json()
-                answersData[questionId] = questionData.answer
-                explanationsData[questionId] = questionData.explanation
+                const questionData = await answerResponse.json();
+                answersData[questionId] = questionData.answer;
+                explanationsData[questionId] = questionData.explanation;
                 
                 // 设置所有答案为已揭示
                 setRevealedAnswers(prev => ({
                   ...prev,
                   [questionId]: true
-                }))
+                }));
               }
             } catch (error) {
-              console.error(`Error fetching answer for question ${questionId}:`, error)
+              console.error(`Error fetching answer for question ${questionId}:`, error);
             }
-          }
+          }));
           
-          setCorrectAnswers(answersData)
-          setExplanations(explanationsData)
+          setCorrectAnswers(answersData);
+          setExplanations(explanationsData);
         }
         
-        setLoading(false)
-      } catch (error) {
-        console.error('Error:', error)
-        setError('获取练习失败，请重试')
-        setLoading(false)
+        setLoading(false);
+      } catch (error: any) {
+        console.error('Error:', error);
+        setError('获取练习失败，请重试');
+        setLoading(false);
       }
-    }
+    };
     
-    fetchPractice()
-  }, [params.id])
+    fetchPractice();
+  }, [params.id]);
   
   // 处理答案提交
   const handleAnswer = (questionId: string, answer: string | string[]) => {
@@ -523,6 +534,16 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     }
   }
   
+  // 返回按钮点击处理
+  const handleBack = () => {
+    // 如果是错题复习，返回到错题本页面
+    if (practice?.type === 'review') {
+      router.push('/mistakes');
+    } else {
+      router.push('/practice');
+    }
+  };
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -574,7 +595,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={() => router.push('/practice')}
+                onClick={handleBack}
                 className="mr-4"
               >
                 <ArrowLeft className="h-4 w-4" />

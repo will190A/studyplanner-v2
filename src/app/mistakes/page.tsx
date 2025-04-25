@@ -8,7 +8,7 @@ import Navbar from '@/components/Navbar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Loader2, BookOpen, Tag, BarChart, Search, Check, 
-  Filter, ChevronRight, RefreshCw, BookX, Trash2 
+  Filter, ChevronRight, RefreshCw, BookX, Trash2, ArrowLeft 
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -154,11 +154,7 @@ export default function MistakesPage() {
       
       // 获取当前过滤后的错题的题目ID列表
       const questionIds = filteredMistakes
-        .filter(mistake => 
-          mistake.status !== 'resolved' && // 只包含未解决和复习中的错题
-          mistake.question && // 确保题目存在
-          mistake.questionId // 确保有题目ID
-        )
+        .filter(mistake => mistake.status !== 'resolved') // 只包含未解决和复习中的错题
         .map(mistake => mistake.questionId);
       
       if (questionIds.length === 0) {
@@ -411,19 +407,29 @@ export default function MistakesPage() {
       <main className="pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">错题本</h1>
-              <p className="text-sm text-gray-500">
-                共 {mistakes.length} 道错题，其中未解决: {
-                  mistakes.filter(m => m.status === 'unresolved').length
-                }，
-                复习中: {
-                  mistakes.filter(m => m.status === 'reviewing').length
-                }，
-                已掌握: {
-                  mistakes.filter(m => m.status === 'resolved').length
-                }
-              </p>
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => router.push('/practice')}
+                className="mr-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">错题本</h1>
+                <p className="text-sm text-gray-500">
+                  共 {mistakes.length} 道错题，其中未解决: {
+                    mistakes.filter(m => m.status === 'unresolved').length
+                  }，
+                  复习中: {
+                    mistakes.filter(m => m.status === 'reviewing').length
+                  }，
+                  已掌握: {
+                    mistakes.filter(m => m.status === 'resolved').length
+                  }
+                </p>
+              </div>
             </div>
             
             <div className="flex flex-wrap gap-2">
