@@ -195,10 +195,10 @@ export default function Reports() {
                 近30天
               </Button>
               <Button 
-                variant={period === 'all' ? 'default' : 'outline'}
-                onClick={() => setPeriod('all')}
+                variant={period === 'year' ? 'default' : 'outline'}
+                onClick={() => setPeriod('year')}
               >
-                全部
+                近一年
               </Button>
             </div>
           </div>

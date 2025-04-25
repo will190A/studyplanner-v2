@@ -22,7 +22,15 @@ export async function GET(request: Request) {
     // 计算日期范围
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(endDate.getDate() - parseInt(period));
+    
+    // 根据不同的时间段设置开始日期
+    if (period === 'year') {
+      // 如果是近一年，设置开始日期为12个月前
+      startDate.setMonth(endDate.getMonth() - 12);
+    } else {
+      // 否则根据period计算日期范围
+      startDate.setDate(endDate.getDate() - parseInt(period));
+    }
     
     // 获取日期范围内的练习记录
     const practices = await Practice.find({
