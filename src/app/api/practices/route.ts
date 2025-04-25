@@ -143,8 +143,16 @@ export async function POST(request: Request) {
               .slice(0, actualCount);
             
             // 转换自定义题目为标准格式
-            questions = selectedQuestions.map(q => ({
-              _id: new mongoose.Types.ObjectId(q._id),
+            questions = (selectedQuestions as unknown as Array<{
+              _id: mongoose.Types.ObjectId;
+              subject: string;
+              content: string;
+              type: 'multiple_choice' | 'fill_blank' | 'short_answer';
+              options?: string[];
+              answer: string;
+              explanation?: string;
+            }>).map(q => ({
+              _id: q._id,
               title: q.subject,
               content: q.content,
               type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
@@ -171,7 +179,7 @@ export async function POST(request: Request) {
           // 错题复习：从用户的错题中选择题目
           if (data.questionIds && Array.isArray(data.questionIds)) {
             // 如果提供了具体的题目ID列表，直接使用这些ID
-            const questionIds = data.questionIds.map(id => new mongoose.Types.ObjectId(id));
+            const questionIds = data.questionIds.map((id: string) => new mongoose.Types.ObjectId(id));
             
             // 分别获取标准题目和自定义题目
             const standardQuestions = await Question.find({
