@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2 } from 'lucide-react'
-import { usePlanStore } from '@/lib/store/planStore'
+import { usePlanStore } from '@/lib/store'
 
 export default function PlanForm() {
   const router = useRouter()
