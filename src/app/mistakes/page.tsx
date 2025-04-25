@@ -267,9 +267,9 @@ export default function MistakesPage() {
   }
   
   // 查看题目详情
-  const viewQuestionDetail = (mistakeId: string) => {
+  const viewQuestionDetail = (questionId: string) => {
     // 跳转到题目详情页面
-    router.push(`/questions/${mistakeId}`)
+    router.push(`/questions/${questionId}`)
   }
   
   // 删除错题

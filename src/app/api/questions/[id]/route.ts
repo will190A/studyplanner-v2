@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import connect from '@/lib/db';
 import Question from '@/models/Question';
+import CustomQuestion from '@/models/CustomQuestion';
 
 // 获取单个题目
 export async function GET(
@@ -15,10 +16,33 @@ export async function GET(
     
     await connect();
     
-    const question = await Question.findById(id);
+    // 先尝试从标准题库获取题目
+    let question = await Question.findById(id);
+    let isCustomQuestion = false;
     
+    // 如果在标准题库中找不到，尝试从自定义题库获取
     if (!question) {
-      return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+      question = await CustomQuestion.findById(id);
+      isCustomQuestion = true;
+      
+      if (!question) {
+        return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+      }
+      
+      // 转换自定义题目格式
+      question = {
+        ...question.toObject(),
+        title: question.subject,
+        type: question.type === 'multiple_choice' ? 'choice' : 
+              question.type === 'fill_blank' ? 'fill' : 'short_answer',
+        options: question.options ? question.options.map((opt: string, index: number) => ({
+          label: String.fromCharCode(65 + index),
+          text: opt
+        })) : [],
+        difficulty: 'medium',
+        category: question.subject,
+        isCustom: true
+      };
     }
     
     // 可以根据需求返回或隐藏答案和解析
@@ -27,7 +51,7 @@ export async function GET(
     
     if (!showAnswer) {
       // 不返回答案和解析
-      const { answer, explanation, ...questionData } = question.toObject();
+      const { answer, explanation, ...questionData } = question;
       return NextResponse.json(questionData);
     }
     
