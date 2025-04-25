@@ -18,7 +18,7 @@ interface QuestionProps {
   id: string
   title: string
   content: string
-  type: 'choice' | 'multiple' | 'judge' | 'fill' | 'code' | 'short_answer'
+  type: 'choice' | 'multiple' | 'judge' | 'fill' | 'fill_blank' | 'code' | 'short_answer'
   options?: QuestionOption[]
   onAnswer: (questionId: string, answer: string | string[]) => void
   userAnswer?: string | string[]
@@ -90,7 +90,7 @@ export default function QuestionCard({
             {type === 'choice' && <span className="badge bg-blue-100 text-blue-800 text-xs py-1 px-2 rounded-full mr-2">单选题</span>}
             {type === 'multiple' && <span className="badge bg-purple-100 text-purple-800 text-xs py-1 px-2 rounded-full mr-2">多选题</span>}
             {type === 'judge' && <span className="badge bg-green-100 text-green-800 text-xs py-1 px-2 rounded-full mr-2">判断题</span>}
-            {type === 'fill' && <span className="badge bg-orange-100 text-orange-800 text-xs py-1 px-2 rounded-full mr-2">填空题</span>}
+            {(type === 'fill' || type === 'fill_blank') && <span className="badge bg-orange-100 text-orange-800 text-xs py-1 px-2 rounded-full mr-2">填空题</span>}
             {type === 'code' && <span className="badge bg-gray-100 text-gray-800 text-xs py-1 px-2 rounded-full mr-2">编程题</span>}
             {type === 'short_answer' && <span className="badge bg-gray-100 text-gray-800 text-xs py-1 px-2 rounded-full mr-2">简答题</span>}
             {title}
@@ -222,18 +222,25 @@ export default function QuestionCard({
             </RadioGroup>
           )}
           
-          {(type === 'fill' || type === 'code' || type === 'short_answer') && (
-            <Textarea
-              value={answer as string}
-              onChange={(e) => handleTextAnswer(e.target.value)}
-              placeholder={
-                type === 'fill' ? "请输入答案" : 
-                type === 'code' ? "请编写代码" : 
-                "请输入简答题答案"
-              }
-              className="min-h-[100px]"
-              disabled={disabled}
-            />
+          {(type === 'fill' || type === 'fill_blank' || type === 'code' || type === 'short_answer') && (
+            <>
+              <Textarea
+                value={answer as string}
+                onChange={(e) => handleTextAnswer(e.target.value)}
+                placeholder={
+                  (type === 'fill' || type === 'fill_blank') ? "请输入答案，如果有多个空请用空格分隔" : 
+                  type === 'code' ? "请编写代码" : 
+                  "请输入简答题答案"
+                }
+                className="min-h-[100px]"
+                disabled={disabled}
+              />
+              {(type === 'fill' || type === 'fill_blank') && (
+                <p className="mt-1 text-sm text-gray-500">
+                  提示：如果题目有多个空，请将答案用空格分隔。例如："答案1 答案2 答案3"
+                </p>
+              )}
+            </>
           )}
           
           {/* 显示解析 */}

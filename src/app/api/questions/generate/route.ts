@@ -100,10 +100,10 @@ ${content}
 8. 所有题目必须与${courseName}课程内容相关
 9. 如果提供了教材内容，应该基于教材内容出题
 10. 对于填空题：
-    - 如果有多个空需要填写，答案之间使用顿号（、）分隔
+    - 如果有多个空需要填写，答案之间使用空格分隔
     - 在题干中使用下划线"_____"表示填空位置
     - 在解析中要说明每个空的答案及其解释
-    - 示例：题目"计算机网络的两个重要特征是_____和_____"，答案"分布式、自治"
+    - 示例：题目"计算机网络的两个重要特征是_____和_____"，答案"分布式 自治"
 
 请按照以下JSON格式返回题目：
 {
@@ -150,11 +150,19 @@ ${content}
       
       // 处理生成的题目
       const questions = responseData.questions.map((q: any, index: number) => {
+        // 确保题型正确
+        let type = q.type;
+        if (type === '填空题') type = 'fill_blank';
+        else if (type === '单选题') type = 'multiple_choice';
+        else if (type === '多选题') type = 'multiple_answer';
+        else if (type === '判断题') type = 'true_false';
+        else if (type === '简答题') type = 'short_answer';
+        
         return {
           ...q,
           id: q.id || `generated-${Date.now()}-${index}`, // 确保每个题目有ID
           subject: courseName, // 确保所属科目正确
-          type: q.type || types[index % types.length] // 确保题型正确
+          type: type || types[index % types.length] // 使用转换后的类型
         };
       });
       
