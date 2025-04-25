@@ -24,11 +24,11 @@ export type ToastOptions = {
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000
 
-type ToasterToast = Omit<ToastProps, 'title' | 'description'> & {
+type ToasterToast = Omit<ToastProps, 'title' | 'description' | 'action'> & {
   id: string
   title?: string | React.ReactNode
   description?: string | React.ReactNode
-  action?: ToastActionElement
+  action?: React.ReactNode & ToastActionElement
   open?: boolean
 }
 
