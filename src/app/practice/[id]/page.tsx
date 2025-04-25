@@ -135,7 +135,10 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           .map((q: PracticeQuestion) => q.questionDetail)
           .filter((q: Question | null | undefined): q is Question => q !== null && q !== undefined);
         
+        console.log('处理后的题目列表:', practiceQuestions);
+        
         if (practiceQuestions.length === 0) {
+          console.error('练习中没有找到题目，原始数据:', data);
           throw new Error('No questions found in practice');
         }
         

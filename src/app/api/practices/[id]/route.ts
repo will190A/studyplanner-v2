@@ -52,7 +52,7 @@ export async function GET(
     
     // Find practice by ID
     const practice = await Practice.findOne({
-      _id: params.id
+      _id: new mongoose.Types.ObjectId(params.id)
     });
 
     if (!practice) {
@@ -63,39 +63,73 @@ export async function GET(
     }
     
     // Get question details
-    const questionIds = practice.questions.map((q: PracticeQuestion) => q.questionId);
+    const questionIds = practice.questions.map((q: PracticeQuestion) => {
+      try {
+        return new mongoose.Types.ObjectId(q.questionId);
+      } catch (error) {
+        console.error('Invalid questionId:', q.questionId);
+        return null;
+      }
+    }).filter(id => id !== null);
+    
+    console.log('查询的题目ID列表:', questionIds);
     
     // 从标准题库获取题目
     const standardQuestions = await Question.find({ 
       _id: { $in: questionIds } 
     }).select('-answer -explanation');
     
+    console.log('标准题库题目数量:', standardQuestions.length);
+    
     // 从自定义题库获取题目
     const customQuestions = await CustomQuestion.find({
       _id: { $in: questionIds }
     }).select('-answer -explanation');
     
+    console.log('自定义题库题目数量:', customQuestions.length);
+    
     // 合并题目信息
     const questions = [
-      ...standardQuestions.map((q: Question) => ({ ...q, isCustom: false })),
+      ...standardQuestions.map((q: Question) => ({ ...q.toObject(), isCustom: false })),
       ...customQuestions.map((q: Question) => ({ 
         _id: q._id,
-        answer: q.answer,
+        title: q.subject,
+        content: q.content,
+        type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
+        options: q.options ? q.options.map((opt: string, index: number) => ({
+          label: String.fromCharCode(65 + index),
+          text: opt
+        })) : [],
+        difficulty: 'medium',
+        category: q.subject,
         isCustom: true
       }))
     ];
     
+    console.log('合并后的题目数量:', questions.length);
+    
     // Merge question information with practice record
     const questionsWithDetail = practice.questions.map((practiceQuestion: PracticeQuestion) => {
-      const questionDetail = questions.find(q =>
-        q._id.toString() === practiceQuestion.questionId.toString()
-      );
-      
-      return {
-        ...(practiceQuestion.toObject ? practiceQuestion.toObject() : practiceQuestion),
-        questionDetail: questionDetail || null
-      };
+      try {
+        const questionId = practiceQuestion.questionId?.toString();
+        const questionDetail = questions.find(q => 
+          q._id?.toString() === questionId
+        );
+        
+        return {
+          ...(practiceQuestion.toObject ? practiceQuestion.toObject() : practiceQuestion),
+          questionDetail: questionDetail || null
+        };
+      } catch (error) {
+        console.error('Error processing question:', practiceQuestion, error);
+        return {
+          ...(practiceQuestion.toObject ? practiceQuestion.toObject() : practiceQuestion),
+          questionDetail: null
+        };
+      }
     });
+    
+    console.log('最终返回的题目数量:', questionsWithDetail.length);
     
     return NextResponse.json({
       ...(practice.toObject ? practice.toObject() : practice),
