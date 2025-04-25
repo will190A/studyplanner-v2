@@ -37,7 +37,7 @@ interface Question {
   answer: string;
   explanation?: string;
   isCustom?: boolean;
-  toObject?: () => any;
+  toObject: () => any;
   subject?: string;
 }
 
