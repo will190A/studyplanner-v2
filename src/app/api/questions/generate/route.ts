@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { MoonshotAPI } from "@/lib/moonshot"
+import mammoth from 'mammoth'
 
 export async function POST(req: Request) {
   try {
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File | null
     const contentFromForm = formData.get("content") as string | null
     const count = parseInt(formData.get("count") as string || "5")
+    const inputMethod = formData.get("inputMethod") as string
 
     // 处理内容来源
     let content = ""
@@ -29,29 +31,44 @@ export async function POST(req: Request) {
     }
     // 如果有上传的文件
     else if (file) {
-      // 处理不同文件类型
-      if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-        const text = await file.text()
-        content = text.slice(0, 5000)
-      } else if (file.type === "application/json" || file.name.endsWith(".json")) {
-        try {
-          const text = await file.text()
-          const json = JSON.parse(text)
-          content = "JSON文件内容: " + JSON.stringify(json, null, 2).slice(0, 5000)
-        } catch (error) {
-          console.error("解析 JSON 文件失败:", error)
+      try {
+        // 处理不同文件类型
+        if (file.type === "text/plain" || file.name.endsWith(".txt")) {
+          const buffer = await file.arrayBuffer();
+          const text = new TextDecoder().decode(buffer);
+          content = text.slice(0, 5000);
+        } else if (file.type === "application/json" || file.name.endsWith(".json")) {
+          const buffer = await file.arrayBuffer();
+          const text = new TextDecoder().decode(buffer);
+          try {
+            const json = JSON.parse(text);
+            content = JSON.stringify(json, null, 2).slice(0, 5000);
+          } catch (error) {
+            throw new Error("JSON文件格式不正确");
+          }
+        } else {
+          throw new Error("不支持的文件类型，仅支持txt和json文件");
         }
-      } else if (
-        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || 
-        file.name.endsWith(".docx") ||
-        file.type === "application/msword" ||
-        file.name.endsWith(".doc")
-      ) {
-        // 由于处理Word文件需要特殊库，这里简化处理
-        content = "上传了Word文档，但当前仅能提取文本内容。请考虑复制文档内容并使用粘贴方式。"
-      } else {
-        content = "上传了不支持直接解析的文件类型。建议复制文件内容并使用粘贴方式。"
+
+        if (!content.trim()) {
+          throw new Error("文件内容为空");
+        }
+
+        console.log("成功读取文件内容:", content.slice(0, 100) + "..."); // 添加日志
+      } catch (error: any) {
+        console.error("处理文件失败:", error);
+        return NextResponse.json(
+          { error: error.message || "处理文件失败" },
+          { status: 400 }
+        );
       }
+    }
+
+    if (!content && inputMethod !== "courseName") {
+      return NextResponse.json(
+        { error: "请提供教材内容" },
+        { status: 400 }
+      );
     }
 
     // 转换题型ID为中文
@@ -136,31 +153,28 @@ ${content ? `教材内容：${content}\n` : ""}
     try {
       responseText = await moonshot.generate(prompt)
       
-      // 尝试修复常见的JSON格式问题
-      responseText = responseText.trim()
-      
       // 如果响应包含```json和```标记，提取中间的JSON部分
-      const jsonRegex = /```(?:json)?\s*([\s\S]*?)```/
-      const jsonMatch = responseText.match(jsonRegex)
+      const jsonRegex = /```(?:json)?\s*([\s\S]*?)```/;
+      const jsonMatch = responseText.match(jsonRegex);
       if (jsonMatch && jsonMatch[1]) {
-        responseText = jsonMatch[1].trim()
+        responseText = jsonMatch[1].trim();
       }
       
       // 确保responseText是一个完整的JSON
       if (!responseText.startsWith('{')) {
-        responseText = responseText.substring(responseText.indexOf('{'))
+        responseText = responseText.substring(responseText.indexOf('{'));
       }
       
       if (!responseText.endsWith('}')) {
-        responseText = responseText.substring(0, responseText.lastIndexOf('}') + 1)
+        responseText = responseText.substring(0, responseText.lastIndexOf('}') + 1);
       }
       
       // 解析并验证JSON
-      const responseData = JSON.parse(responseText)
+      const responseData = JSON.parse(responseText);
       
       // 确保返回数据格式正确
       if (!responseData.questions || !Array.isArray(responseData.questions)) {
-        throw new Error("生成的数据格式不正确")
+        throw new Error("生成的数据格式不正确");
       }
       
       // 处理生成的题目
@@ -170,37 +184,34 @@ ${content ? `教材内容：${content}\n` : ""}
           id: q.id || `generated-${Date.now()}-${index}`, // 确保每个题目有ID
           subject: courseName, // 确保所属科目正确
           type: q.type || types[index % types.length] // 确保题型正确
-        }
-      })
+        };
+      });
       
-      return NextResponse.json({ questions })
+      return NextResponse.json({ questions });
     } catch (error) {
-      console.error("解析生成的题目JSON失败:", error, "原始文本:", responseText)
-      
-      // 在解析失败时使用 mock 数据作为后备方案
-      const mockQuestions = generateMockQuestions(courseName, types, count)
-      return NextResponse.json({ 
-        questions: mockQuestions,
-        warning: "API返回数据解析失败，已生成模拟题目数据"
-      })
+      console.error("生成题目失败:", error);
+      return NextResponse.json(
+        { error: "生成题目失败，请稍后重试" },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error("生成题目失败:", error)
+    console.error("生成题目失败:", error);
     return NextResponse.json(
       { error: "生成题目失败" },
       { status: 500 }
-    )
+    );
   }
 }
 
 // 生成 mock 题目作为后备方案
 function generateMockQuestions(courseName: string, types: string[], count: number) {
-  const questions = []
+  const questions = [];
   
   for (let i = 0; i < count; i++) {
     // 循环使用题型
-    const typeIndex = i % types.length
-    const type = types[typeIndex]
+    const typeIndex = i % types.length;
+    const type = types[typeIndex];
     
     let question: any = {
       id: `mock-${Date.now()}-${i}`,
@@ -209,50 +220,50 @@ function generateMockQuestions(courseName: string, types: string[], count: numbe
       answer: "",
       explanation: `这是一个自动生成的模拟题目，由于API返回数据解析失败而创建。`,
       subject: courseName
-    }
+    };
     
     // 根据题型生成不同内容
     switch (type) {
       case "multiple_choice":
-        question.content = `在${courseName}中，以下哪一项是正确的描述？`
+        question.content = `在${courseName}中，以下哪一项是正确的描述？`;
         question.options = [
           "这是选项 A 的内容",
           "这是选项 B 的内容",
           "这是选项 C 的内容",
           "这是选项 D 的内容"
-        ]
-        question.answer = "A"
+        ];
+        question.answer = "A";
         break;
         
       case "multiple_answer":
-        question.content = `在${courseName}中，以下哪些选项是正确的？（多选）`
+        question.content = `在${courseName}中，以下哪些选项是正确的？（多选）`;
         question.options = [
           "这是选项 A 的内容",
           "这是选项 B 的内容",
           "这是选项 C 的内容",
           "这是选项 D 的内容"
-        ]
-        question.answer = "A,C"
+        ];
+        question.answer = "A,C";
         break;
         
       case "fill_blank":
-        question.content = `在${courseName}中，________ 是一个重要的概念。`
-        question.answer = "某个概念名称"
+        question.content = `在${courseName}中，________ 是一个重要的概念。`;
+        question.answer = "某个概念名称";
         break;
         
       case "short_answer":
-        question.content = `简述${courseName}中的一个核心原理。`
-        question.answer = "这是一个关于核心原理的简要回答。由于API返回数据解析错误，这是一个示例答案。"
+        question.content = `简述${courseName}中的一个核心原理。`;
+        question.answer = "这是一个关于核心原理的简要回答。由于API返回数据解析错误，这是一个示例答案。";
         break;
         
       case "true_false":
-        question.content = `在${courseName}中，某个概念是最基础的概念之一。这个说法是正确的吗？`
-        question.answer = "正确"
+        question.content = `在${courseName}中，某个概念是最基础的概念之一。这个说法是正确的吗？`;
+        question.answer = "正确";
         break;
     }
     
-    questions.push(question)
+    questions.push(question);
   }
   
-  return questions
-} 
+  return questions;
+}

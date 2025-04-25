@@ -4,10 +4,11 @@
  */
 export class MoonshotAPI {
   private apiKey: string
-  private baseUrl = "https://api.moonshot.cn/v1"
+  private apiEndpoint: string
 
   constructor() {
     this.apiKey = process.env.MOONSHOT_API_KEY || ""
+    this.apiEndpoint = process.env.MOONSHOT_API_ENDPOINT || "https://api.moonshot.cn/v1"
     if (!this.apiKey) {
       console.warn("MOONSHOT_API_KEY 环境变量未设置，将使用 mock 数据")
     }
@@ -19,40 +20,43 @@ export class MoonshotAPI {
    * @returns 生成的内容
    */
   async generate(prompt: string): Promise<string> {
-    // 如果没有设置 API Key，使用 mock 数据
-    if (!this.apiKey) {
-      return this.mockResponse(prompt)
-    }
-
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      if (!this.apiKey) {
+        throw new Error("Missing Moonshot API key")
+      }
+
+      const response = await fetch(`${this.apiEndpoint}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${this.apiKey}`,
+          "Authorization": `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
           model: "moonshot-v1-8k",
           messages: [
             {
-              role: "user",
-              content: prompt,
+              role: "system",
+              content: "你是一个专业的教育工作者，擅长根据教材内容出题。你需要仔细阅读教材内容，确保生成的题目与内容相关，难度适中，答案准确。"
             },
+            {
+              role: "user",
+              content: prompt
+            }
           ],
           temperature: 0.7,
-        }),
+          max_tokens: 4000
+        })
       })
 
       if (!response.ok) {
-        throw new Error(`Moonshot API error: ${response.statusText}`)
+        throw new Error(`API request failed with status ${response.status}`)
       }
 
       const data = await response.json()
       return data.choices[0].message.content
     } catch (error) {
-      console.error("Moonshot API 调用失败:", error)
-      // 出错时使用 mock 数据
-      return this.mockResponse(prompt)
+      console.error("Moonshot API error:", error)
+      throw error // 不再使用 mockResponse，而是抛出错误
     }
   }
 

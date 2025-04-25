@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,6 +39,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Resolver } from 'react-hook-form';
 
 // 生成器表单验证
 const generatorFormSchema = z.object({
@@ -84,6 +85,7 @@ export default function QuestionGenerator() {
   const [successDialog, setSuccessDialog] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationTime, setGenerationTime] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -127,7 +129,7 @@ export default function QuestionGenerator() {
 
   // 表单处理
   const form = useForm<GeneratorFormValues>({
-    resolver: zodResolver(generatorFormSchema),
+    resolver: zodResolver(generatorFormSchema) as Resolver<GeneratorFormValues, any, GeneratorFormValues>,
     defaultValues: {
       inputMethod: 'courseName',
       courseName: '',
@@ -136,6 +138,7 @@ export default function QuestionGenerator() {
       count: '5',
       addToExisting: false,
       existingLibrary: '',
+      libraryName: '',
     }
   });
 
@@ -169,22 +172,91 @@ export default function QuestionGenerator() {
     }
   };
 
+  // 清除文件选择
+  const clearFileSelection = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setSelectedFile(null);
+    form.setValue('file', undefined);
+  }, [form]);
+
   // 处理文件上传
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      form.setValue('file', file);
-      
-      // 从文件名中提取可能的课程名
-      const fileName = file.name.replace(/\.\w+$/, '');
-      if (fileName.length >= 2 && fileName.length <= 20 && !form.getValues('courseName')) {
-        const courseName = await extractCourseName(fileName);
-        if (courseName) {
-          form.setValue('courseName', courseName);
+      // 检查文件类型
+      const isValidType = file.type === "text/plain" || 
+                         file.name.endsWith(".txt") ||
+                         file.type === "application/json" ||
+                         file.name.endsWith(".json");
+                         
+      if (!isValidType) {
+        toast({
+          title: "不支持的文件类型",
+          description: "请上传 TXT 或 JSON 格式的文件",
+          variant: "destructive"
+        });
+        clearFileSelection();
+        return;
+      }
+
+      // 检查文件大小
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        toast({
+          title: "文件过大",
+          description: "请上传小于5MB的文件",
+          variant: "destructive"
+        });
+        clearFileSelection();
+        return;
+      }
+
+      // 读取文件内容
+      try {
+        const buffer = await file.arrayBuffer();
+        let content = '';
+        
+        if (file.type === "application/json" || file.name.endsWith(".json")) {
+          const text = new TextDecoder().decode(buffer);
+          try {
+            const json = JSON.parse(text);
+            content = JSON.stringify(json, null, 2);
+          } catch (error) {
+            toast({
+              title: "JSON格式错误",
+              description: "请确保上传的JSON文件格式正确",
+              variant: "destructive"
+            });
+            clearFileSelection();
+            return;
+          }
+        } else {
+          content = new TextDecoder().decode(buffer);
         }
+
+        // 设置文件
+        setSelectedFile(file);
+        form.setValue('file', file);
+
+        // 从文件内容中提取课程名称
+        if (!form.getValues('courseName')) {
+          const courseName = await extractCourseName(content);
+          if (courseName) {
+            form.setValue('courseName', courseName);
+          }
+        }
+      } catch (error) {
+        console.error('读取文件失败:', error);
+        toast({
+          title: "读取文件失败",
+          description: "请确保文件格式正确",
+          variant: "destructive"
+        });
+        clearFileSelection();
       }
     }
-  };
+  }, [clearFileSelection, form, toast]);
 
   // 监听输入方式变化
   useEffect(() => {
@@ -224,12 +296,33 @@ export default function QuestionGenerator() {
       formData.append('courseName', finalLibraryName);
       formData.append('types', JSON.stringify(data.questionTypes));
       formData.append('count', data.count);
+      formData.append('inputMethod', data.inputMethod);
       
       // 根据输入方式添加不同内容
       if (data.inputMethod === 'paste' && data.content) {
         formData.append('content', data.content);
       } else if (data.inputMethod === 'upload' && data.file) {
-        formData.append('file', data.file);
+        try {
+          const file = data.file as File;
+          formData.append('file', file);
+          
+          // 读取文件内容用于调试
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const content = e.target?.result;
+            console.log('文件内容预览:', content ? content.toString().slice(0, 100) + '...' : 'No content');
+          };
+          reader.readAsText(file);
+        } catch (error) {
+          console.error('读取文件失败:', error);
+          toast({
+            title: "读取文件失败",
+            description: "请确保文件格式正确",
+            variant: "destructive"
+          });
+          setLoading(false);
+          return;
+        }
       }
       
       // 开始进度指示
@@ -312,14 +405,6 @@ export default function QuestionGenerator() {
         clearInterval(progressInterval.current);
         progressInterval.current = null;
       }
-    }
-  };
-
-  // 清除文件选择
-  const clearFileSelection = () => {
-    form.setValue('file', undefined);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
@@ -440,49 +525,51 @@ export default function QuestionGenerator() {
                   {inputMethod === 'upload' && (
                     <div className="mt-6">
                       <FormLabel>上传文件</FormLabel>
-                      {!form.getValues('file') ? (
-                        <div 
-                          className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary cursor-pointer transition-colors"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <div className="flex flex-col items-center">
-                            <FileUp className="h-10 w-10 text-gray-400 mb-2" />
-                            <p className="text-sm font-medium text-gray-700 mb-1">点击或拖拽文件到此处上传</p>
-                            <p className="text-xs text-gray-500">支持 TXT, DOC, DOCX, JSON 格式</p>
-                          </div>
-                          <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            accept=".txt,.doc,.docx,.json"
-                            onChange={handleFileChange}
-                          />
-                        </div>
-                      ) : (
-                        <div className="mt-2 border rounded-lg p-4 flex items-center justify-between">
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-3">
-                              <FileUp className="h-5 w-5 text-blue-500" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 truncate max-w-xs">
-                                {(form.getValues('file') as File).name}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {((form.getValues('file') as File).size / 1024).toFixed(1)} KB
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={clearFileSelection}
+                      <div>
+                        {!selectedFile ? (
+                          <div 
+                            className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary cursor-pointer transition-colors"
+                            onClick={() => fileInputRef.current?.click()}
                           >
-                            重新选择
-                          </Button>
-                        </div>
-                      )}
+                            <div className="flex flex-col items-center">
+                              <FileUp className="h-10 w-10 text-gray-400 mb-2" />
+                              <p className="text-sm font-medium text-gray-700 mb-1">点击或拖拽文件到此处上传</p>
+                              <p className="text-xs text-gray-500">支持 TXT 和 JSON 格式</p>
+                            </div>
+                            <input
+                              type="file"
+                              ref={fileInputRef}
+                              className="hidden"
+                              accept=".txt,.json"
+                              onChange={handleFileChange}
+                            />
+                          </div>
+                        ) : (
+                          <div className="mt-2 border rounded-lg p-4 flex items-center justify-between">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center mr-3">
+                                <FileUp className="h-5 w-5 text-blue-500" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-700 truncate max-w-xs">
+                                  {selectedFile.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {(selectedFile.size / 1024).toFixed(1)} KB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={clearFileSelection}
+                            >
+                              重新选择
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

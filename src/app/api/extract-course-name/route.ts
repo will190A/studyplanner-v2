@@ -1,45 +1,53 @@
 import { NextResponse } from 'next/server';
 import { MoonshotAPI } from "@/lib/moonshot";
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    let content: string;
-    try {
-      const body = await request.json();
-      content = body.content;
-    } catch (e) {
-      return NextResponse.json({ error: '无效的JSON格式' }, { status: 400 });
+    const { content } = await req.json();
+    
+    if (!content) {
+      return NextResponse.json(
+        { error: "请提供内容" },
+        { status: 400 }
+      );
     }
 
-    if (!content || typeof content !== 'string') {
-      return NextResponse.json({ error: '内容不能为空且必须是字符串' }, { status: 400 });
-    }
+    // 构建提示词
+    const prompt = `请分析以下教学内容，提取出这段内容最可能属于的课程名称。要求：
+1. 返回一个简短的课程名称（2-10个字符）
+2. 不要包含章节号、标点符号等
+3. 优先提取常见课程名称，如：数据结构、计算机网络、操作系统等
+4. 如果内容不明确，返回空字符串
+5. 只返回课程名称，不要其他任何解释或标点
 
-    // 使用 MoonshotAPI 提取课程名称
+内容：
+${content.slice(0, 1000)}`;
+
+    // 调用AI接口提取课程名称
     const moonshot = new MoonshotAPI();
-    const prompt = `请从以下文本中提取出最可能的课程名称：
-
-${content}
-
-规则：
-1. 返回的课程名称应该在2-20个字符之间
-2. 优先提取正式的课程名称，如"数据结构"、"计算机网络"等
-3. 如果是章节内容，提取主要学科名称
-4. 去除无关的修饰词，如"课件"、"讲义"、"第X章"等
-5. 只返回课程名称，不要包含任何其他文字
-6. 如果无法提取出合适的课程名称，返回空字符串
-
-请直接返回提取出的课程名称，不要包含任何其他解释或说明。`;
-
     const courseName = await moonshot.generate(prompt);
     
-    return NextResponse.json({ courseName: courseName.trim() });
+    // 清理结果
+    const cleanedName = courseName
+      .trim()
+      .replace(/^[第一二三四五六七八九十]+[章节]/, '') // 移除章节号
+      .replace(/^[0-9.]+/, '') // 移除数字编号
+      .replace(/[:：].*$/, '') // 移除冒号及其后内容
+      .replace(/[《》]/g, '') // 移除书名号
+      .trim();
 
-  } catch (error: any) {
-    console.error('提取课程名称时出错:', error);
-    return NextResponse.json({ 
-      error: '提取课程名称失败',
-      message: error.message || '未知错误'
-    }, { status: 500 });
+    // 验证提取的课程名称
+    if (cleanedName.length >= 2 && cleanedName.length <= 10) {
+      return NextResponse.json({ courseName: cleanedName });
+    } else {
+      return NextResponse.json({ courseName: "" });
+    }
+
+  } catch (error) {
+    console.error("提取课程名称失败:", error);
+    return NextResponse.json(
+      { error: "提取课程名称失败" },
+      { status: 500 }
+    );
   }
 } 
