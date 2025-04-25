@@ -70,7 +70,7 @@ export default function DailyPracticePage() {
         
         const recordsData = await recordsResponse.json()
         // 确保打卡记录按日期正序排序（从早到晚）
-        const sortedRecords = (recordsData.checkInRecords || []).sort((a, b) => 
+        const sortedRecords = (recordsData.checkInRecords || []).sort((a: { date: string }, b: { date: string }) => 
           new Date(a.date).getTime() - new Date(b.date).getTime()
         )
         setCheckInRecords(sortedRecords)
