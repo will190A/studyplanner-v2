@@ -30,7 +30,7 @@ const CustomQuestionSchema: Schema = new Schema({
 CustomQuestionSchema.index({ userId: 1, content: 1 }, { unique: true });
 
 // 添加删除钩子，在删除题目时同时删除相关的错题记录
-CustomQuestionSchema.pre('remove', async function(next) {
+CustomQuestionSchema.pre('deleteOne', { document: true }, async function(next) {
   try {
     await mongoose.model('Mistake').deleteMany({
       questionId: this._id,
@@ -38,7 +38,7 @@ CustomQuestionSchema.pre('remove', async function(next) {
     });
     next();
   } catch (error) {
-    next(error);
+    next(error as Error);
   }
 });
 
