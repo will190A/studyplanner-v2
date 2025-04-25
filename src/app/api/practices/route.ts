@@ -147,7 +147,7 @@ export async function POST(request: Request) {
             title: q.subject,
             content: q.content,
             type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
-            options: q.options ? q.options.map((opt, index) => ({
+            options: q.options ? q.options.map((opt: string, index: number) => ({
               label: String.fromCharCode(65 + index), // A, B, C...
               text: opt
             })) : [],
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
               title: q.subject,
               content: q.content,
               type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
-              options: q.options ? q.options.map((opt, index) => ({
+              options: q.options ? q.options.map((opt: string, index: number) => ({
                 label: String.fromCharCode(65 + index),
                 text: opt
               })) : [],
@@ -217,7 +217,7 @@ export async function POST(request: Request) {
               title: q.subject,
               content: q.content,
               type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
-              options: q.options ? q.options.map((opt, index) => ({
+              options: q.options ? q.options.map((opt: string, index: number) => ({
                 label: String.fromCharCode(65 + index),
                 text: opt
               })) : [],
@@ -244,7 +244,7 @@ export async function POST(request: Request) {
             title: q.subject,
             content: q.content,
             type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
-            options: q.options ? q.options.map((opt, index) => ({
+            options: q.options ? q.options.map((opt: string, index: number) => ({
               label: String.fromCharCode(65 + index),
               text: opt
             })) : [],
