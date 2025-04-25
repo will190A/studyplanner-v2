@@ -101,7 +101,7 @@ export async function GET(
     });
     
     return NextResponse.json({
-      ...practice.toObject(),
+      ...(practice.toObject ? practice.toObject() : practice),
       questions: questionsWithDetail
     });
   } catch (error) {
@@ -256,7 +256,7 @@ export async function PUT(
     return NextResponse.json({
       message: 'Practice updated successfully',
       practice: {
-        ...updatedPractice.toObject(),
+        ...(updatedPractice.toObject ? updatedPractice.toObject() : updatedPractice),
         correctCount: updatedPractice.correctCount,
         accuracy: updatedPractice.accuracy
       }
