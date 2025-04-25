@@ -81,17 +81,9 @@ export async function GET(
         ...(q.toObject ? q.toObject() : q), 
         isCustom: false 
       })),
-      ...customQuestions.map((q: Question) => ({ 
+      ...customQuestions.map((q: Question) => ({
         _id: q._id,
-        title: q.subject,
-        content: q.content,
-        type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
-        options: q.options ? q.options.map((opt: string, index: number) => ({
-          label: String.fromCharCode(65 + index), // A, B, C...
-          text: opt
-        })) : [],
-        difficulty: 'medium', // 默认难度
-        category: q.subject,
+        answer: q.answer,
         isCustom: true
       }))
     ];
