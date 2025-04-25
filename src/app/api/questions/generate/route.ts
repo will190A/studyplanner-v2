@@ -79,7 +79,7 @@ ${content ? `教材内容：${content}\n` : ""}
       "id": "唯一ID",
       "type": "${types[0]}", // 题型应为 multiple_choice, multiple_answer, fill_blank, short_answer, true_false 之一
       "content": "题目内容",
-      "options": ["选项A", "选项B", "选项C", "选项D"], // 仅选择题需要
+      "options": ["执行次数有限，执行时间无限", "执行次数无限，执行时间有限"], // 示例选项格式
       "answer": "正确答案", // 多选题答案格式为 "A,C,D"
       "explanation": "题目解析",
       "subject": "${courseName}"
@@ -90,17 +90,45 @@ ${content ? `教材内容：${content}\n` : ""}
 请确保你的回复是一个有效的JSON对象，并且只包含JSON内容，不要添加任何其他文本或说明。
 
 题型说明：
-- multiple_choice: 单选题，必须包含options字段，答案为单个选项如"A"
-- multiple_answer: 多选题，必须包含options字段，答案格式为"A,C,D"等
-- fill_blank: 填空题，答案应为填空内容
-- short_answer: 简答题，答案应为简要回答
-- true_false: 判断题，答案应为"正确"或"错误"/"对"或"错"/"T"或"F"
+- multiple_choice: 单选题
+  * 必须包含options字段，包含4个选项
+  * 选项数组中的选项顺序对应 A、B、C、D，但选项内容中不要包含选项字母
+  * 答案必须是 "A"、"B"、"C" 或 "D" 中的一个
+  * 必须确保只有一个选项是正确的
+  * 其他选项必须是合理的干扰项
+  * 错误选项不能是明显错误或无关的内容
+  * 选项内容不要重复"A."、"B."等前缀，直接写选项内容
 
-确保每个题目的类型字段必须是下列值之一: ${types.join(", ")}。
-每个题目必须包含题干(content)、答案(answer)和解析(explanation)。
-选择题必须包含选项(options)数组。
-生成的JSON必须是有效的且可以被解析为JavaScript对象。
-尽量根据提供的内容生成难度适中的题目。`
+- multiple_answer: 多选题
+  * 必须包含options字段，包含4个选项
+  * 选项数组中的选项顺序对应 A、B、C、D，但选项内容中不要包含选项字母
+  * 答案格式为"A,C,D"等，表示多个正确选项
+  * 至少要有2个正确选项
+  * 其他选项必须是合理的干扰项
+  * 选项内容不要重复"A."、"B."等前缀，直接写选项内容
+
+- fill_blank: 填空题
+  * 答案应为填空内容
+  * 答案应该简洁明确
+
+- short_answer: 简答题
+  * 答案应为简要回答
+  * 答案应该包含关键点
+
+- true_false: 判断题
+  * 答案必须是"正确"或"错误"
+  * 题目必须是明确的判断陈述句
+
+要求：
+1. 确保每个题目的类型字段必须是下列值之一: ${types.join(", ")}
+2. 每个题目必须包含题干(content)、答案(answer)和解析(explanation)
+3. 选择题必须包含选项(options)数组
+4. 生成的JSON必须是有效的且可以被解析为JavaScript对象
+5. 题目难度要适中，不要太简单或太难
+6. 题目内容要准确，符合学科规范
+7. 解析要详细说明为什么正确答案是正确的，以及为什么其他选项是错误的
+8. 所有题目必须与${courseName}课程内容相关
+9. 如果提供了教材内容，应该基于教材内容出题`
 
     // 调用Moonshot API生成题目
     const moonshot = new MoonshotAPI()

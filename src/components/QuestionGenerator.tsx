@@ -405,7 +405,7 @@ export default function QuestionGenerator() {
                         </FormLabel>
                         <FormControl>
                           <Input 
-                            placeholder={inputMethod === 'courseName' ? "请输入课程名称，如：数据结构" : "留空将从内容自动提取"}
+                            placeholder={inputMethod === 'courseName' ? "请输入课程名称，如：数据结构" : "留空将由AI自动生成"}
                             {...field} 
                             required={inputMethod === 'courseName'}
                           />
