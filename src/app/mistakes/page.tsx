@@ -8,7 +8,7 @@ import Navbar from '@/components/Navbar'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Loader2, BookOpen, Tag, BarChart, Search, Check, 
-  Filter, ChevronRight, RefreshCw, BookX 
+  Filter, ChevronRight, RefreshCw, BookX, Trash2 
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 
 interface Question {
   _id: string
@@ -46,6 +48,7 @@ interface Mistake {
 
 export default function MistakesPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [mistakes, setMistakes] = useState<Mistake[]>([])
@@ -70,8 +73,10 @@ export default function MistakesPage() {
         }
         
         const data = await response.json()
-        setMistakes(data.mistakes || [])
-        setFilteredMistakes(data.mistakes || [])
+        // 过滤掉已删除的题目
+        const validMistakes = data.mistakes.filter((mistake: Mistake) => mistake.question)
+        setMistakes(validMistakes || [])
+        setFilteredMistakes(validMistakes || [])
         setLoading(false)
       } catch (error) {
         console.error('Error:', error)
@@ -107,8 +112,8 @@ export default function MistakesPage() {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(
         mistake => 
-          mistake.question.title.toLowerCase().includes(term) ||
-          mistake.question.content.toLowerCase().includes(term) ||
+          mistake.question?.title?.toLowerCase().includes(term) ||
+          mistake.question?.content?.toLowerCase().includes(term) ||
           mistake.category.toLowerCase().includes(term)
       )
     }
@@ -267,6 +272,68 @@ export default function MistakesPage() {
     router.push(`/questions/${mistakeId}`)
   }
   
+  // 删除错题
+  const deleteMistake = async (mistakeId: string) => {
+    try {
+      const response = await fetch(`/api/mistakes/${mistakeId}`, {
+        method: 'DELETE',
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete mistake')
+      }
+      
+      // 更新本地状态
+      setMistakes(prev => prev.filter(m => m._id !== mistakeId))
+      setFilteredMistakes(prev => prev.filter(m => m._id !== mistakeId))
+      setSelectedMistakes(prev => prev.filter(id => id !== mistakeId))
+
+      // 显示成功提示
+      toast({
+        title: "删除成功",
+        description: "错题已成功删除",
+      })
+    } catch (error) {
+      console.error('Error deleting mistake:', error)
+      setError('删除错题失败，请重试')
+    }
+  }
+  
+  // 批量删除错题
+  const deleteSelectedMistakes = async () => {
+    if (!selectedMistakes.length) return
+    
+    try {
+      const response = await fetch('/api/mistakes/batch', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          mistakeIds: selectedMistakes
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete mistakes')
+      }
+      
+      // 更新本地状态
+      setMistakes(prev => prev.filter(m => !selectedMistakes.includes(m._id)))
+      setFilteredMistakes(prev => prev.filter(m => !selectedMistakes.includes(m._id)))
+      setSelectedMistakes([])
+
+      // 显示成功提示
+      toast({
+        title: "删除成功",
+        description: `已成功删除 ${selectedMistakes.length} 道错题`,
+      })
+    } catch (error) {
+      console.error('Error deleting mistakes:', error)
+      setError('删除错题失败，请重试')
+    }
+  }
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -297,6 +364,7 @@ export default function MistakesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+      <Toaster />
       <main className="pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
@@ -343,6 +411,15 @@ export default function MistakesPage() {
                   >
                     <Check className="h-4 w-4" />
                     标记为已掌握
+                  </Button>
+
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-1 text-red-600"
+                    onClick={deleteSelectedMistakes}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    删除选中
                   </Button>
                 </>
               )}
@@ -471,16 +548,20 @@ export default function MistakesPage() {
                             
                             <div className="flex-1">
                               <div className="flex flex-wrap gap-2 mb-2">
-                                <Badge className={getDifficultyClass(mistake.question.difficulty)}>
-                                  {mistake.question.difficulty}
-                                </Badge>
-                                <Badge className="bg-blue-100 text-blue-800">
-                                  {getTypeLabel(mistake.question.type)}
-                                </Badge>
+                                {mistake.question && (
+                                  <>
+                                    <Badge className={getDifficultyClass(mistake.question.difficulty)}>
+                                      {mistake.question.difficulty}
+                                    </Badge>
+                                    <Badge className="bg-blue-100 text-blue-800">
+                                      {mistake.question.type}
+                                    </Badge>
+                                  </>
+                                )}
                                 <Badge className="bg-purple-100 text-purple-800">
                                   {mistake.category}
                                 </Badge>
-                                {mistake.question.subcategory && (
+                                {mistake.question && mistake.question.subcategory && (
                                   <Badge className="bg-indigo-100 text-indigo-800">
                                     {mistake.question.subcategory}
                                   </Badge>
@@ -491,11 +572,11 @@ export default function MistakesPage() {
                               </div>
                               
                               <h3 className="text-lg font-medium mb-2">
-                                {mistake.question.title}
+                                {mistake.question ? mistake.question.title : '题目已删除'}
                               </h3>
                               
                               <p className="text-sm text-gray-700 line-clamp-2 mb-3">
-                                {mistake.question.content}
+                                {mistake.question ? mistake.question.content : '题目内容不可用'}
                               </p>
                               
                               <div className="flex flex-wrap items-center justify-between text-sm text-gray-500">
@@ -504,15 +585,26 @@ export default function MistakesPage() {
                                   <span>最近错误: {formatDate(mistake.lastWrongDate)}</span>
                                 </div>
                                 
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="flex items-center"
-                                  onClick={() => viewQuestionDetail(mistake.questionId)}
-                                >
-                                  查看详情
-                                  <ChevronRight className="ml-1 h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="flex items-center"
+                                    onClick={() => viewQuestionDetail(mistake.questionId)}
+                                  >
+                                    查看详情
+                                    <ChevronRight className="ml-1 h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="flex items-center text-red-600"
+                                    onClick={() => deleteMistake(mistake._id)}
+                                  >
+                                    删除
+                                    <Trash2 className="ml-1 h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>

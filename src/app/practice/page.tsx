@@ -122,7 +122,7 @@ export default function Practice() {
     try {
       // 获取当前用户ID
       const userId = getUserId();
-      const response = await fetch(`/api/mistakes?userId=${userId}&limit=1`);
+      const response = await fetch(`/api/mistakes?userId=${userId}&status=unresolved,reviewing`);
       if (response.ok) {
         const data = await response.json();
         setMistakeCount(data.pagination?.total || 0);

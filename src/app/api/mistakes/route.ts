@@ -26,7 +26,11 @@ export async function GET(request: Request) {
     // 构建查询条件
     const query: any = { userId };
     if (category) query.category = category;
-    if (status) query.status = status;
+    if (status) {
+      // 支持多个状态筛选，用逗号分隔
+      const statuses = status.split(',');
+      query.status = { $in: statuses };
+    }
     
     await connect();
     
