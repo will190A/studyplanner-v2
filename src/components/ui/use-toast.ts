@@ -28,7 +28,7 @@ type ToasterToast = Omit<ToastProps, 'title' | 'description' | 'action'> & {
   id: string
   title?: string | React.ReactNode
   description?: string | React.ReactNode
-  action?: React.ReactNode & ToastActionElement
+  action?: React.ReactNode
   open?: boolean
 }
 
