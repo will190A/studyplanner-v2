@@ -28,6 +28,16 @@ interface Category {
   description: string;
 }
 
+interface CustomLibraryQuestion {
+  subject: string;
+  [key: string]: any;
+}
+
+interface LibraryResponse {
+  questions: CustomLibraryQuestion[];
+  subjects: string[];
+}
+
 export default function Practice() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -141,25 +151,20 @@ export default function Practice() {
       const response = await fetch(`/api/questions/library?limit=100`);
       
       if (response.ok) {
-        const data = await response.json();
-        // 按科目分组题目
-        const subjectGroups: Record<string, any[]> = {};
+        const data: LibraryResponse = await response.json();
         
-        if (data && data.questions && Array.isArray(data.questions)) {
-          data.questions.forEach((question: any) => {
-            if (!subjectGroups[question.subject]) {
-              subjectGroups[question.subject] = [];
-            }
-            subjectGroups[question.subject].push(question);
+        if (data && data.subjects && Array.isArray(data.subjects)) {
+          // 使用返回的subjects数组
+          const libraries = data.subjects.map(subject => {
+            // 计算该科目下的题目数量
+            const questions = data.questions.filter(q => q.subject === subject);
+            return {
+              name: subject,
+              count: questions.length,
+              id: subject.toLowerCase().replace(/\s+/g, '-'),
+              isCustom: true
+            };
           });
-          
-          // 转换为数组格式
-          const libraries = Object.entries(subjectGroups).map(([subject, questions]) => ({
-            name: subject,
-            count: questions.length,
-            id: subject.toLowerCase().replace(/\s+/g, '-'),
-            isCustom: true // 标记为自定义题库
-          }));
           
           setCustomLibraries(libraries);
         }
@@ -178,6 +183,15 @@ export default function Practice() {
       // 获取当前用户ID
       const userId = getUserId();
       
+      // 如果是自定义题库，获取该题库的题目数量
+      let count = 10; // 默认为10题
+      if (isCustom) {
+        const library = customLibraries.find(lib => lib.name === category);
+        if (library) {
+          count = library.count; // 使用题库中的实际题目数量
+        }
+      }
+      
       const response = await fetch('/api/practices', {
         method: 'POST',
         headers: {
@@ -186,7 +200,7 @@ export default function Practice() {
         body: JSON.stringify({
           type: 'category',
           category,
-          count: 5, // 使用默认值5
+          count,
           userId,
           isCustom
         })

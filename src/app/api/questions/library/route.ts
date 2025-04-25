@@ -56,13 +56,26 @@ export async function POST(req: Request) {
       subject: courseName || q.subject
     }))
 
-    // 批量保存题目
-    await CustomQuestion.insertMany(questionsWithUserId)
+    // 使用 bulkWrite 进行批量操作
+    const bulkOps = questionsWithUserId.map(question => ({
+      updateOne: {
+        filter: {
+          userId: question.userId,
+          subject: question.subject,
+          content: question.content
+        },
+        update: { $set: question },
+        upsert: true // 如果不存在则插入
+      }
+    }))
+
+    // 执行批量操作
+    const result = await CustomQuestion.bulkWrite(bulkOps)
 
     return NextResponse.json({
       success: true,
       message: "题目已保存到您的自定义题库",
-      count: questions.length
+      count: result.upsertedCount + result.modifiedCount
     })
   } catch (error) {
     console.error("保存题目失败:", error)
@@ -108,11 +121,20 @@ export async function GET(req: Request) {
     const total = await CustomQuestion.countDocuments(query)
 
     // 查询题目
-    const questions = await CustomQuestion.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean()
+    let questions;
+    if (limit === 100) {
+      // 如果limit是100，返回所有题目（不分页）
+      questions = await CustomQuestion.find(query)
+        .sort({ createdAt: -1 })
+        .lean()
+    } else {
+      // 否则使用分页
+      questions = await CustomQuestion.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+    }
 
     // 查询所有科目
     const subjects = await CustomQuestion.distinct("subject", { userId })
