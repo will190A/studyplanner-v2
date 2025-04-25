@@ -50,11 +50,19 @@ export default function GeneratePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [errorMessage, setError] = useState<string | null>(null)
+  const [apiDebugInfo, setApiDebugInfo] = useState<{
+    requestTime?: string;
+    responseTime?: string;
+    taskCount?: number;
+    firstTask?: any;
+    error?: string;
+  } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsGenerating(true)
     setError(null)
+    setApiDebugInfo(null)
 
     // 检查用户是否已登录
     if (!session?.user?.id) {
@@ -77,8 +85,24 @@ export default function GeneratePage() {
 
     try {
       console.log('Starting plan generation...')
+      
+      // 记录请求时间
+      const requestTime = new Date().toISOString();
+      setApiDebugInfo(prev => ({ ...prev, requestTime }));
+      
+      // 检查 URL 中是否有测试 API 密钥
+      const params = new URLSearchParams(window.location.search);
+      const testApiKey = params.get('apiKey');
+      
+      // 构建请求 URL
+      let url = '/api/generate-plan';
+      if (testApiKey) {
+        url += `?apiKey=${encodeURIComponent(testApiKey)}`;
+        console.log('使用测试 API 密钥');
+      }
+      
       // 生成 AI 计划
-      const response = await fetch('/api/generate-plan', {
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,11 +117,30 @@ export default function GeneratePage() {
 
       const data = await response.json()
       
+      // 记录响应时间和基本信息
+      const responseTime = new Date().toISOString();
+      setApiDebugInfo(prev => ({ 
+        ...prev, 
+        responseTime,
+        taskCount: data.tasks?.length || 0,
+        firstTask: data.tasks?.[0] || null
+      }));
+      
       if (!response.ok) {
+        console.error('API 响应错误:', data);
+        setApiDebugInfo(prev => ({ ...prev, error: data.error || '未知错误' }));
         throw new Error(data.error || '生成计划失败')
       }
 
-      console.log('Plan generated, saving...')
+      if (!data.tasks || !Array.isArray(data.tasks) || data.tasks.length === 0) {
+        console.error('API 返回了无效的任务数据:', data);
+        throw new Error('返回的计划任务无效');
+      }
+
+      console.log('Plan generated, saving...', data.tasks.length, 'tasks');
+      console.log('前3个任务示例:', JSON.stringify(data.tasks.slice(0, 3), null, 2));
+      console.log('任务数量分布:', countTasksPerDay(data.tasks));
+      
       const { tasks } = data
 
       // 保存计划
@@ -125,7 +168,13 @@ export default function GeneratePage() {
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error)
-      setError(error instanceof Error ? error.message : '创建计划时发生错误')
+      if (error instanceof Error) {
+        setError(error.message)
+        setApiDebugInfo(prev => ({ ...prev, error: error.message }));
+      } else {
+        setError('创建计划时发生错误')
+        setApiDebugInfo(prev => ({ ...prev, error: '未知错误' }));
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -222,9 +271,41 @@ export default function GeneratePage() {
                 )}
               </Button>
             </div>
+
+            {/* API调试信息 */}
+            {apiDebugInfo && (
+              <div className="mt-4 p-4 border rounded bg-gray-50 text-xs">
+                <h3 className="font-bold mb-2">API调试信息</h3>
+                <div>请求时间: {apiDebugInfo.requestTime}</div>
+                <div>响应时间: {apiDebugInfo.responseTime}</div>
+                {apiDebugInfo.error ? (
+                  <div className="text-red-500">错误: {apiDebugInfo.error}</div>
+                ) : (
+                  <>
+                    <div>任务数量: {apiDebugInfo.taskCount}</div>
+                    {apiDebugInfo.firstTask && (
+                      <div>
+                        <div>第一个任务示例:</div>
+                        <pre className="mt-1 p-2 bg-gray-100 overflow-auto">
+                          {JSON.stringify(apiDebugInfo.firstTask, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
     </div>
   )
+}
+
+function countTasksPerDay(tasks: Task[]) {
+  const dateCount: Record<string, number> = {};
+  tasks.forEach(task => {
+    dateCount[task.date] = (dateCount[task.date] || 0) + 1;
+  });
+  return dateCount;
 } 
