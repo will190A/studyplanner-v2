@@ -103,7 +103,7 @@ export async function GET(
       );
       
       return {
-        ...practiceQuestion.toObject(),
+        ...(practiceQuestion.toObject ? practiceQuestion.toObject() : practiceQuestion),
         questionDetail: questionDetail || null
       };
     });
