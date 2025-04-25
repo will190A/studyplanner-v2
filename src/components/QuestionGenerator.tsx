@@ -143,51 +143,34 @@ export default function QuestionGenerator() {
   const inputMethod = form.watch('inputMethod');
   const addToExisting = form.watch('addToExisting');
   
-  // 当paste或upload时，自动从内容中提取可能的课程名称
-  useEffect(() => {
-    if (inputMethod === 'paste') {
-      const content = form.getValues('content');
-      if (content && !form.getValues('courseName')) {
-        // 尝试从内容中提取可能的课程名
-        const possibleTitle = extractCourseName(content);
-        if (possibleTitle) {
-          form.setValue('courseName', possibleTitle);
-        }
-      }
-    }
-  }, [form.watch('content')]);
-
   // 从内容中提取可能的课程名称
-  const extractCourseName = (content: string): string => {
-    // 查找常见的课程名称格式
-    // 例如：第一章 XXX课程，XXX导论，XXX概论，等
-    const patterns = [
-      /《([^》]{2,20})》/,  // 查找书名号中的内容
-      /第[一二三四五六七八九十\d]+章\s*([^\n]{2,20})/,  // 查找章节标题
-      /(\w{2,20})(概论|导论|原理|基础|入门)/,  // 查找常见课程后缀
-      /(\w{2,20})(学)/  // 查找"XX学"的模式
-    ];
-    
-    for (const pattern of patterns) {
-      const match = content.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
+  const extractCourseName = async (content: string): Promise<string> => {
+    if (!content) return '';
+
+    try {
+      // 调用AI接口提取课程名称
+      const response = await fetch('/api/extract-course-name', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        throw new Error('提取课程名称失败');
       }
+
+      const data = await response.json();
+      return data.courseName || '';
+    } catch (error) {
+      console.error('提取课程名称时出错:', error);
+      return '';
     }
-    
-    // 如果没有找到匹配的模式，尝试提取内容的前几个字符作为标题
-    if (content.length > 10) {
-      const firstLine = content.split('\n')[0].trim();
-      if (firstLine.length > 5 && firstLine.length < 30) {
-        return firstLine;
-      }
-    }
-    
-    return '';
   };
 
   // 处理文件上传
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       form.setValue('file', file);
@@ -195,10 +178,30 @@ export default function QuestionGenerator() {
       // 从文件名中提取可能的课程名
       const fileName = file.name.replace(/\.\w+$/, '');
       if (fileName.length >= 2 && fileName.length <= 20 && !form.getValues('courseName')) {
-        form.setValue('courseName', fileName);
+        const courseName = await extractCourseName(fileName);
+        if (courseName) {
+          form.setValue('courseName', courseName);
+        }
       }
     }
   };
+
+  // 监听输入方式变化
+  useEffect(() => {
+    const updateCourseName = async () => {
+      if (inputMethod === 'paste') {
+        const content = form.getValues('content');
+        if (content && !form.getValues('courseName')) {
+          const courseName = await extractCourseName(content);
+          if (courseName) {
+            form.setValue('courseName', courseName);
+          }
+        }
+      }
+    };
+
+    updateCourseName();
+  }, [form.watch('content')]);
 
   // 开始AI生成题目
   const onSubmit = async (data: GeneratorFormValues) => {
