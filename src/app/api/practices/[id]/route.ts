@@ -76,7 +76,10 @@ export async function GET(
     
     // 合并题目信息
     const questions = [
-      ...standardQuestions.map((q: Question) => ({ ...q.toObject(), isCustom: false })),
+      ...standardQuestions.map((q: Question) => ({ 
+        ...(q.toObject ? q.toObject() : q), 
+        isCustom: false 
+      })),
       ...customQuestions.map((q: Question) => ({ 
         _id: q._id,
         title: q.subject,
