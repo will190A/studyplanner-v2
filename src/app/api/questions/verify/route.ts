@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       // 处理多选题 - 答案格式如 "A,B,C" 或 "A|B|C"
       if (question.answer.includes(',') || question.answer.includes('|')) {
         const separator = question.answer.includes(',') ? ',' : '|';
-        const correctAnswerArray = question.answer.split(separator).map(a => a.trim());
+        const correctAnswerArray = question.answer.split(separator).map((a: string) => a.trim());
         
         if (Array.isArray(userAnswer)) {
           // 排序两个数组进行比较
