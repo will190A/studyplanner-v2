@@ -36,6 +36,8 @@ interface Question {
   answer: string;
   explanation?: string;
   isCustom?: boolean;
+  toObject?: () => any;
+  subject?: string;
 }
 
 // 获取单个练习记录
