@@ -44,6 +44,7 @@ interface Mistake {
   createdAt: string
   updatedAt: string
   question: Question
+  isCustom: boolean
 }
 
 export default function MistakesPage() {
@@ -82,7 +83,7 @@ export default function MistakesPage() {
             console.log('无效的错题记录:', {
               mistakeId: mistake._id,
               questionId: mistake.questionId,
-              isCustom: mistake.isCustom,
+              isCustom: mistake.isCustom || false,
               status: mistake.status
             });
           }
