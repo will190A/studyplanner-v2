@@ -114,7 +114,7 @@ export async function POST(request: Request) {
             // 如果不匹配，尝试按字母比较
             if (!isCorrect && question.options && Array.isArray(question.options)) {
               // 查找与内容匹配的选项索引
-              const contentMatchIndex = question.options.findIndex(opt => opt === userAnswer);
+              const contentMatchIndex = question.options.findIndex((opt: string) => opt === userAnswer);
               if (contentMatchIndex >= 0) {
                 // 将索引转为字母并比较
                 const letterFromContent = String.fromCharCode(65 + contentMatchIndex);
