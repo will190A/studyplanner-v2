@@ -155,7 +155,7 @@ export async function POST(request: Request) {
               _id: q._id,
               title: q.subject,
               content: q.content,
-              type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
+              type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
               options: q.options ? q.options.map((opt: string, index: number) => ({
                 label: String.fromCharCode(65 + index), // A, B, C...
                 text: opt
@@ -258,7 +258,7 @@ export async function POST(request: Request) {
               _id: new mongoose.Types.ObjectId(q._id),
               title: q.subject,
               content: q.content,
-              type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
+              type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
               options: q.options ? q.options.map((opt: string, index: number) => ({
                 label: String.fromCharCode(65 + index),
                 text: opt

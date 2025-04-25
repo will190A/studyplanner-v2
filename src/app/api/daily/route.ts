@@ -50,12 +50,12 @@ export async function GET(request: Request) {
             content: q.content,
             type: q.type === 'multiple_choice' 
               ? (isMultipleChoice ? 'multiple' : 'choice') 
-              : q.type === 'fill_blank' ? 'fill' : 'code',
+              : q.type === 'fill_blank' ? 'fill' : 'short_answer',
             options: q.options ? q.options.map((opt: string, index: number) => ({
               label: String.fromCharCode(65 + index),
               text: opt
             })) : [],
-            answer: isMultipleChoice ? q.answer.split(/[,|]/).map(a => a.trim()) : q.answer,
+            answer: isMultipleChoice ? q.answer.split(/[,|]/).map((a: string) => a.trim()) : q.answer,
             explanation: q.explanation || '暂无解析',
             isCustom: true
           }
