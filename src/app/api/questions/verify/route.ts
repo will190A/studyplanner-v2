@@ -76,7 +76,8 @@ export async function POST(request: Request) {
               lastWrongDate: new Date(),
               wrongAnswer: userAnswer,
               status: 'unresolved',
-              category: isCustomQuestion ? question.subject : question.category
+              category: isCustomQuestion ? question.subject : question.category,
+              isCustom: isCustomQuestion // 确保设置 isCustom 字段
             }
           },
           { 
@@ -86,6 +87,13 @@ export async function POST(request: Request) {
           }
         );
         console.log('更新或创建错题记录:', mistake._id);
+        console.log('错题详情:', {
+          userId,
+          questionId: question._id,
+          isCustom: isCustomQuestion,
+          category: isCustomQuestion ? question.subject : question.category,
+          status: 'unresolved'
+        });
       } catch (error) {
         console.error('保存错题时出错:', error);
         // 不要因为保存错题失败而影响答案验证结果

@@ -73,8 +73,19 @@ export default function MistakesPage() {
         }
         
         const data = await response.json()
+        console.log('获取到的错题数据:', data.mistakes);
+        
         // 过滤掉已删除的题目
-        const validMistakes = data.mistakes.filter((mistake: Mistake) => mistake.question)
+        const validMistakes = data.mistakes.filter((mistake: Mistake) => {
+          const isValid = mistake.question && mistake.questionId;
+          if (!isValid) {
+            console.log('无效的错题记录:', mistake);
+          }
+          return isValid;
+        });
+        
+        console.log('过滤后的有效错题:', validMistakes);
+        
         setMistakes(validMistakes || [])
         setFilteredMistakes(validMistakes || [])
         setLoading(false)
@@ -118,6 +129,9 @@ export default function MistakesPage() {
       )
     }
     
+    // 确保所有错题都有有效的题目信息
+    filtered = filtered.filter(mistake => mistake.question && mistake.questionId)
+    
     setFilteredMistakes(filtered)
   }, [mistakes, searchTerm, categoryFilter, statusFilter, currentTab])
   
@@ -133,6 +147,25 @@ export default function MistakesPage() {
     try {
       setLoading(true)
       
+      // 获取当前过滤后的错题的题目ID列表
+      const questionIds = filteredMistakes
+        .filter(mistake => 
+          mistake.status !== 'resolved' && // 只包含未解决和复习中的错题
+          mistake.question && // 确保题目存在
+          mistake.questionId // 确保有题目ID
+        )
+        .map(mistake => mistake.questionId);
+      
+      if (questionIds.length === 0) {
+        toast({
+          title: "无可用题目",
+          description: "当前筛选条件下没有可练习的错题",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
+      
       const response = await fetch('/api/practices', {
         method: 'POST',
         headers: {
@@ -140,21 +173,26 @@ export default function MistakesPage() {
         },
         body: JSON.stringify({
           type: 'review',
-          count: 10 // 默认10题
+          questionIds // 传递具体的题目ID列表
         })
       })
       
       if (!response.ok) {
-        throw new Error('Failed to create practice')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create practice');
       }
       
       const data = await response.json()
       
+      if (!data || !data.practice || !data.practice._id) {
+        throw new Error('创建练习失败：返回数据格式错误');
+      }
+      
       // 跳转到练习页面
       router.push(`/practice/${data.practice._id}`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating practice:', error)
-      setError('创建练习失败，请重试')
+      setError(error.message || '创建练习失败，请重试')
       setLoading(false)
     }
   }

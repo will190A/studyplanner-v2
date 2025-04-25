@@ -94,6 +94,8 @@ export async function GET(request: Request) {
       };
     });
     
+    console.log('错题列表:', mistakesWithQuestions);
+    
     return NextResponse.json({
       mistakes: mistakesWithQuestions,
       pagination: {

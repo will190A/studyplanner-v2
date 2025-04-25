@@ -168,16 +168,68 @@ export async function POST(request: Request) {
         
       case 'review':
         // 错题复习：从用户的错题中选择题目
-        const mistakes = await Mistake.find({ 
-          userId, 
-          status: { $in: ['unresolved', 'reviewing'] } 
-        }).limit(count);
-        
-        const questionIds = mistakes.map(mistake => mistake.questionId);
-        
-        questions = await Question.find({
-          _id: { $in: questionIds }
-        }).select('-answer -explanation');
+        if (data.questionIds && Array.isArray(data.questionIds)) {
+          // 如果提供了具体的题目ID列表，直接使用这些ID
+          // 分别获取标准题目和自定义题目
+          const standardQuestions = await Question.find({
+            _id: { $in: data.questionIds }
+          }).select('-answer -explanation');
+          
+          const customQuestions = await CustomQuestion.find({
+            _id: { $in: data.questionIds }
+          }).select('-answer -explanation');
+          
+          // 合并题目列表
+          questions = [
+            ...standardQuestions,
+            ...customQuestions.map(q => ({
+              _id: q._id,
+              title: q.subject,
+              content: q.content,
+              type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
+              options: q.options ? q.options.map((opt, index) => ({
+                label: String.fromCharCode(65 + index),
+                text: opt
+              })) : [],
+              difficulty: 'medium',
+              category: q.subject
+            }))
+          ];
+        } else {
+          // 否则使用原来的逻辑，但移除limit限制
+          const mistakes = await Mistake.find({ 
+            userId, 
+            status: { $in: ['unresolved', 'reviewing'] } 
+          }).sort({ lastWrongDate: -1 }); // 按最后错误时间排序，但不限制数量
+          
+          const questionIds = mistakes.map(mistake => mistake.questionId);
+          
+          // 分别获取标准题目和自定义题目
+          const standardQuestions = await Question.find({
+            _id: { $in: questionIds }
+          }).select('-answer -explanation');
+          
+          const customQuestions = await CustomQuestion.find({
+            _id: { $in: questionIds }
+          }).select('-answer -explanation');
+          
+          // 合并题目列表
+          questions = [
+            ...standardQuestions,
+            ...customQuestions.map(q => ({
+              _id: q._id,
+              title: q.subject,
+              content: q.content,
+              type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
+              options: q.options ? q.options.map((opt, index) => ({
+                label: String.fromCharCode(65 + index),
+                text: opt
+              })) : [],
+              difficulty: 'medium',
+              category: q.subject
+            }))
+          ];
+        }
         break;
         
       case 'random':
