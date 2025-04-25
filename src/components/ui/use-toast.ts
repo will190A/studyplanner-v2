@@ -30,6 +30,7 @@ type ToasterToast = Omit<ToastProps, 'title' | 'description' | 'action'> & {
   description?: string | React.ReactNode
   action?: React.ReactNode
   open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 // Storage for toasts
