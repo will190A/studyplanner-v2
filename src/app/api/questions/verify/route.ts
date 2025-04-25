@@ -46,7 +46,94 @@ export async function POST(request: Request) {
 
     // 检查答案是否正确
     let isCorrect = false;
-    if (Array.isArray(question.answer)) {
+    
+    // 记录更多调试信息
+    console.log('问题类型详细:', question.type);
+    console.log('题目选项:', question.options);
+    console.log('正确答案类型:', typeof question.answer);
+    console.log('用户答案类型:', typeof userAnswer);
+    
+    // 自定义题目处理逻辑
+    if (isCustomQuestion) {
+      // 处理多选题 - 答案格式如 "A,B,C" 或 "A|B|C"
+      if (question.answer.includes(',') || question.answer.includes('|')) {
+        const separator = question.answer.includes(',') ? ',' : '|';
+        const correctAnswerArray = question.answer.split(separator).map(a => a.trim());
+        
+        if (Array.isArray(userAnswer)) {
+          // 排序两个数组进行比较
+          const sortedCorrectAnswer = [...correctAnswerArray].sort();
+          const sortedUserAnswer = [...userAnswer].sort();
+          isCorrect = sortedCorrectAnswer.length === sortedUserAnswer.length &&
+            sortedCorrectAnswer.every((ans, index) => ans === sortedUserAnswer[index]);
+        } else if (typeof userAnswer === 'string') {
+          // 如果用户答案是单个字符串，但可能包含多个选项
+          const userAnswerArray = userAnswer.includes(',') || userAnswer.includes('|') ? 
+            userAnswer.replace(/[,|]/g, ',').split(',').map(a => a.trim()) : 
+            [userAnswer.trim()];
+          
+          const sortedCorrectAnswer = [...correctAnswerArray].sort();
+          const sortedUserAnswer = [...userAnswerArray].sort();
+          isCorrect = sortedCorrectAnswer.length === sortedUserAnswer.length &&
+            sortedCorrectAnswer.every((ans, index) => ans === sortedUserAnswer[index]);
+        }
+        
+        console.log('多选题比较:', { correctAnswerArray, userAnswer, isCorrect });
+      } 
+      // 处理单选题
+      else {
+        // 直接比较字符串，同时处理可能的文本和字母选项差异
+        if (typeof userAnswer === 'string') {
+          // 如果答案是选项字母（如"B"）而不是选项内容（如"RDD"）
+          if (userAnswer.length === 1 && /[A-Z]/i.test(userAnswer)) {
+            // 将选项字母映射到选项内容
+            if (question.options && Array.isArray(question.options)) {
+              const optionIndex = userAnswer.toUpperCase().charCodeAt(0) - 65; // A=0, B=1, ...
+              if (optionIndex >= 0 && optionIndex < question.options.length) {
+                // 比较选项内容和正确答案
+                const optionContent = question.options[optionIndex];
+                // 检查选项内容是否匹配答案
+                isCorrect = optionContent === question.answer || 
+                           String.fromCharCode(65 + optionIndex) === question.answer;
+                console.log('选项字母转内容比较:', { 
+                  userLetter: userAnswer,
+                  optionIndex,
+                  optionContent,
+                  correctAnswer: question.answer,
+                  isCorrect
+                });
+              }
+            } else {
+              // 直接比较字母
+              isCorrect = userAnswer.toUpperCase() === question.answer.toUpperCase();
+              console.log('字母直接比较:', { userAnswer, correctAnswer: question.answer, isCorrect });
+            }
+          } else {
+            // 直接比较字符串
+            isCorrect = userAnswer === question.answer;
+            // 如果不匹配，尝试按字母比较
+            if (!isCorrect && question.options && Array.isArray(question.options)) {
+              // 查找与内容匹配的选项索引
+              const contentMatchIndex = question.options.findIndex(opt => opt === userAnswer);
+              if (contentMatchIndex >= 0) {
+                // 将索引转为字母并比较
+                const letterFromContent = String.fromCharCode(65 + contentMatchIndex);
+                isCorrect = letterFromContent === question.answer;
+                console.log('内容转字母比较:', { 
+                  userContent: userAnswer,
+                  letterFromContent,
+                  correctAnswer: question.answer,
+                  isCorrect
+                });
+              }
+            }
+            console.log('内容直接比较:', { userAnswer, correctAnswer: question.answer, isCorrect });
+          }
+        }
+      }
+    } 
+    // 标准题库处理逻辑
+    else if (Array.isArray(question.answer)) {
       // 多选题
       if (Array.isArray(userAnswer)) {
         // 排序两个数组，确保顺序不同但内容相同的答案也能被判定为正确

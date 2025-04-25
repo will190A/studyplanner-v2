@@ -41,19 +41,25 @@ export async function GET(request: Request) {
       // 合并所有可用题目
       const allQuestions = [
         ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
-        ...customQuestions.map(q => ({ 
-          _id: q._id,
-          title: q.subject,
-          content: q.content,
-          type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
-          options: q.options ? q.options.map((opt: string, index: number) => ({
-            label: String.fromCharCode(65 + index),
-            text: opt
-          })) : [],
-          answer: q.answer,
-          explanation: q.explanation || '暂无解析',
-          isCustom: true
-        }))
+        ...customQuestions.map(q => { 
+          // 检查是否是多选题（答案包含多个选项）
+          const isMultipleChoice = q.answer.includes(',') || q.answer.includes('|');
+          return {
+            _id: q._id,
+            title: q.subject,
+            content: q.content,
+            type: q.type === 'multiple_choice' 
+              ? (isMultipleChoice ? 'multiple' : 'choice') 
+              : q.type === 'fill_blank' ? 'fill' : 'code',
+            options: q.options ? q.options.map((opt: string, index: number) => ({
+              label: String.fromCharCode(65 + index),
+              text: opt
+            })) : [],
+            answer: isMultipleChoice ? q.answer.split(/[,|]/).map(a => a.trim()) : q.answer,
+            explanation: q.explanation || '暂无解析',
+            isCustom: true
+          }
+        })
       ];
 
       if (allQuestions.length === 0) {
