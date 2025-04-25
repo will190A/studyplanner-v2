@@ -4,7 +4,12 @@ import mongoose from 'mongoose';
 async function initializeUserCollection() {
   try {
     if (mongoose.connection.readyState === 1) { // 如果数据库已连接
-      const collections = await mongoose.connection.db.collections();
+      const db = mongoose.connection.db;
+      if (!db) {
+        console.error('Database connection is not established');
+        return;
+      }
+      const collections = await db.collections();
       const usersCollection = collections.find(c => c.collectionName === 'users');
       if (usersCollection) {
         await usersCollection.dropIndexes();
