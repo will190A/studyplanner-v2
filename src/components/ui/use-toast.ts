@@ -24,12 +24,12 @@ export type ToastOptions = {
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000
 
-type ToasterToast = ToastProps & {
+interface ToasterToast extends ToastProps {
   id: string
-  title?: string
-  description?: string
-  duration?: number
-  variant?: "default" | "destructive"
+  title?: React.ReactNode
+  description?: React.ReactNode
+  action?: ToastActionElement
+  open?: boolean
 }
 
 // Storage for toasts
