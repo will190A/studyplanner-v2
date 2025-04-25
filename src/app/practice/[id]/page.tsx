@@ -9,6 +9,7 @@ import QuestionCard from '@/components/QuestionCard'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowLeft, Clock, Check } from 'lucide-react'
 import { useSession } from 'next-auth/react'
+import { toast } from '@/components/ui/use-toast'
 
 interface Question {
   _id: string
@@ -266,6 +267,27 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         [questionId]: true
       }))
       
+      // 立即更新错题状态
+      const mistakeResponse = await fetch('/api/mistakes/batch-update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          updates: [{
+            questionId,
+            status: data.isCorrect ? 'resolved' : 'reviewing'
+          }]
+        })
+      });
+      
+      if (!mistakeResponse.ok) {
+        console.error('Failed to update mistake status');
+      } else {
+        const mistakeData = await mistakeResponse.json();
+        console.log('错题状态更新结果:', mistakeData);
+      }
+      
       return data.isCorrect
     } catch (error) {
       console.error('Error verifying answer:', error)
@@ -340,6 +362,45 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         }
       }
       
+      // 更新错题状态
+      const mistakeUpdates = questions.map(question => {
+        const isCorrect = questionResults[question._id];
+        return {
+          questionId: question._id,
+          status: isCorrect ? 'resolved' : 'reviewing'
+        };
+      });
+      
+      // 批量更新错题状态
+      const mistakeResponse = await fetch('/api/mistakes/batch-update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          updates: mistakeUpdates
+        })
+      });
+      
+      if (!mistakeResponse.ok) {
+        console.error('Failed to update mistake statuses');
+      } else {
+        const mistakeData = await mistakeResponse.json();
+        console.log('错题状态更新结果:', mistakeData);
+      }
+      
+      // 显示完成提示
+      const accuracy = (Object.values(questionResults).filter(result => result).length / questions.length) * 100;
+      toast({
+        title: "练习完成",
+        description: `正确率: ${accuracy.toFixed(1)}%`,
+      })
+      
+      // 3秒后跳转到练习列表
+      setTimeout(() => {
+        router.push('/practice')
+      }, 3000)
+      
       setIsSubmitting(false)
     } catch (error) {
       console.error('Error submitting practice:', error)
@@ -387,6 +448,79 @@ export default function PracticePage({ params }: { params: { id: string } }) {
       ...prev,
       [questionId]: judgment
     }))
+  }
+  
+  // 完成练习
+  const completePractice = async () => {
+    try {
+      setLoading(true)
+      
+      // 计算正确率
+      const correctCount = Object.values(questionResults).filter(result => result).length;
+      const accuracy = (correctCount / questions.length) * 100;
+      
+      // 更新练习记录
+      const response = await fetch(`/api/practices/${params.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          completed: true,
+          correctCount,
+          accuracy,
+          timeCompleted: new Date()
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to complete practice')
+      }
+      
+      // 更新错题状态
+      const mistakeUpdates = questions.map((question, index) => {
+        const isCorrect = questionResults[question._id];
+        return {
+          questionId: question._id,
+          status: isCorrect ? 'resolved' : 'reviewing'
+        };
+      });
+      
+      // 批量更新错题状态
+      const mistakeResponse = await fetch('/api/mistakes/batch-update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          updates: mistakeUpdates
+        })
+      });
+      
+      if (!mistakeResponse.ok) {
+        console.error('Failed to update mistake statuses');
+      }
+      
+      // 更新本地状态
+      setIsCompleted(true)
+      setElapsedTime(0)
+      
+      // 显示完成提示
+      toast({
+        title: "练习完成",
+        description: `正确率: ${accuracy.toFixed(1)}%`,
+      })
+      
+      // 3秒后跳转到练习列表
+      setTimeout(() => {
+        router.push('/practice')
+      }, 3000)
+    } catch (error) {
+      console.error('Error completing practice:', error)
+      setError('完成练习失败，请重试')
+    } finally {
+      setLoading(false)
+    }
   }
   
   if (loading) {

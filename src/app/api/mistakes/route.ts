@@ -56,6 +56,12 @@ export async function GET(request: Request) {
       _id: { $in: questionIds }
     });
     
+    console.log('获取到的题目:', {
+      standardQuestions: standardQuestions.length,
+      customQuestions: customQuestions.length,
+      totalMistakes: mistakes.length
+    });
+    
     // 将题目信息与错题记录合并
     const mistakesWithQuestions = mistakes.map(mistake => {
       let question = null;
@@ -88,21 +94,37 @@ export async function GET(request: Request) {
         );
       }
       
+      // 如果找不到题目，记录日志
+      if (!question) {
+        console.log('找不到题目:', {
+          mistakeId: mistake._id,
+          questionId: mistake.questionId,
+          isCustom: mistake.isCustom
+        });
+      }
+      
       return {
         ...mistake.toObject(),
         question: question || null
       };
     });
     
-    console.log('错题列表:', mistakesWithQuestions);
+    // 过滤掉没有题目的错题记录
+    const validMistakes = mistakesWithQuestions.filter(mistake => mistake.question !== null);
+    
+    console.log('错题列表处理结果:', {
+      totalMistakes: mistakes.length,
+      validMistakes: validMistakes.length,
+      invalidMistakes: mistakes.length - validMistakes.length
+    });
     
     return NextResponse.json({
-      mistakes: mistakesWithQuestions,
+      mistakes: validMistakes,
       pagination: {
-        total,
+        total: validMistakes.length,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
+        totalPages: Math.ceil(validMistakes.length / limit)
       }
     });
   } catch (error) {

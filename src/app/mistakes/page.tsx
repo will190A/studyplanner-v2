@@ -73,18 +73,23 @@ export default function MistakesPage() {
         }
         
         const data = await response.json()
-        console.log('获取到的错题数据:', data.mistakes);
+        console.log('获取到的错题数据:', data.mistakes)
         
         // 过滤掉已删除的题目
         const validMistakes = data.mistakes.filter((mistake: Mistake) => {
           const isValid = mistake.question && mistake.questionId;
           if (!isValid) {
-            console.log('无效的错题记录:', mistake);
+            console.log('无效的错题记录:', {
+              mistakeId: mistake._id,
+              questionId: mistake.questionId,
+              isCustom: mistake.isCustom,
+              status: mistake.status
+            });
           }
           return isValid;
         });
         
-        console.log('过滤后的有效错题:', validMistakes);
+        console.log('过滤后的有效错题:', validMistakes)
         
         setMistakes(validMistakes || [])
         setFilteredMistakes(validMistakes || [])
