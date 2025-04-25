@@ -28,6 +28,16 @@ interface PracticeQuestion {
   isCorrect?: boolean;
 }
 
+interface Question {
+  _id: string;
+  content: string;
+  type: string;
+  options?: string[];
+  answer: string;
+  explanation?: string;
+  isCustom?: boolean;
+}
+
 // 获取单个练习记录
 export async function GET(
   request: Request,
@@ -64,8 +74,8 @@ export async function GET(
     
     // 合并题目信息
     const questions = [
-      ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
-      ...customQuestions.map(q => ({ 
+      ...standardQuestions.map((q: Question) => ({ ...q.toObject(), isCustom: false })),
+      ...customQuestions.map((q: Question) => ({ 
         _id: q._id,
         title: q.subject,
         content: q.content,
@@ -160,8 +170,8 @@ export async function PUT(
       
       // 合并题目信息
       const questions = [
-        ...standardQuestions.map(q => ({ ...q.toObject(), isCustom: false })),
-        ...customQuestions.map(q => ({ 
+        ...standardQuestions.map((q: Question) => ({ ...q.toObject(), isCustom: false })),
+        ...customQuestions.map((q: Question) => ({ 
           _id: q._id,
           answer: q.answer,
           isCustom: true
