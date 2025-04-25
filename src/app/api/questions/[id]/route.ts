@@ -28,21 +28,50 @@ export async function GET(
       if (!question) {
         return NextResponse.json({ error: 'Question not found' }, { status: 404 });
       }
+
+      // 转换自定义题目类型
+      const questionType = question.type === 'multiple_choice' ? 'choice' : 
+                          question.type === 'fill_blank' ? 'fill' : 'short_answer';
+      
+      // 处理答案转换
+      let formattedAnswer = question.answer;
+      
+      // 如果是单选题，并且答案不是字母（A,B,C...），尝试转换为字母格式
+      if (question.type === 'multiple_choice' && question.options) {
+        // 检查答案是否是选项内容而不是字母
+        const optionIndex = question.options.findIndex((opt: string) => opt === question.answer);
+        
+        if (optionIndex >= 0) {
+          // 将选项内容转换为字母表示（A, B, C...）
+          formattedAnswer = String.fromCharCode(65 + optionIndex);
+          console.log('将答案内容转换为字母:', {
+            originalAnswer: question.answer,
+            convertedAnswer: formattedAnswer
+          });
+        }
+      }
       
       // 转换自定义题目格式
       question = {
         ...question.toObject(),
         title: question.subject,
-        type: question.type === 'multiple_choice' ? 'choice' : 
-              question.type === 'fill_blank' ? 'fill' : 'short_answer',
+        type: questionType,
         options: question.options ? question.options.map((opt: string, index: number) => ({
           label: String.fromCharCode(65 + index),
           text: opt
         })) : [],
         difficulty: 'medium',
         category: question.subject,
-        isCustom: true
+        isCustom: true,
+        answer: formattedAnswer
       };
+      
+      console.log('转换后的自定义题目:', {
+        id: question._id,
+        type: questionType,
+        originalType: question.type,
+        answer: formattedAnswer
+      });
     }
     
     // 可以根据需求返回或隐藏答案和解析

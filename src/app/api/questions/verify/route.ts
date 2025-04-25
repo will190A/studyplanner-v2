@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     // 尝试从标准题库获取题目
     let question = await Question.findById(questionId);
     let isCustomQuestion = false;
+    let correctAnswer = null;
 
     // 如果在标准题库中找不到，尝试从自定义题库获取
     if (!question) {
@@ -55,6 +56,27 @@ export async function POST(request: Request) {
     
     // 自定义题目处理逻辑
     if (isCustomQuestion) {
+      // 如果是multiple_choice类型（单选题），预处理答案格式
+      if (question.type === 'multiple_choice' && question.options) {
+        // 如果答案是选项文本而不是字母，转换为字母格式
+        const optionIndex = question.options.findIndex((opt: string) => opt === question.answer);
+        if (optionIndex >= 0) {
+          correctAnswer = String.fromCharCode(65 + optionIndex);
+          console.log('将原始答案转换为字母格式:', {
+            originalAnswer: question.answer,
+            convertedAnswer: correctAnswer
+          });
+        } else {
+          // 如果答案已经是字母格式，保持不变
+          correctAnswer = question.answer;
+        }
+      } else {
+        // 其他类型题目保持原始答案
+        correctAnswer = question.answer;
+      }
+      
+      console.log('自定义题目最终处理后的答案:', correctAnswer);
+      
       // 处理多选题 - 答案格式如 "A,B,C" 或 "A|B|C"
       if (question.answer.includes(',') || question.answer.includes('|')) {
         const separator = question.answer.includes(',') ? ',' : '|';
@@ -81,60 +103,40 @@ export async function POST(request: Request) {
         console.log('多选题比较:', { correctAnswerArray, userAnswer, isCorrect });
       } 
       // 处理单选题
-      else {
-        // 直接比较字符串，同时处理可能的文本和字母选项差异
+      else if (question.type === 'multiple_choice') {
+        console.log('处理自定义单选题 multiple_choice');
+        
         if (typeof userAnswer === 'string') {
-          // 如果答案是选项字母（如"B"）而不是选项内容（如"RDD"）
-          if (userAnswer.length === 1 && /[A-Z]/i.test(userAnswer)) {
-            // 将选项字母映射到选项内容
-            if (question.options && Array.isArray(question.options)) {
-              const optionIndex = userAnswer.toUpperCase().charCodeAt(0) - 65; // A=0, B=1, ...
-              if (optionIndex >= 0 && optionIndex < question.options.length) {
-                // 比较选项内容和正确答案
-                const optionContent = question.options[optionIndex];
-                // 检查选项内容是否匹配答案
-                isCorrect = optionContent === question.answer || 
-                           String.fromCharCode(65 + optionIndex) === question.answer;
-                console.log('选项字母转内容比较:', { 
-                  userLetter: userAnswer,
-                  optionIndex,
-                  optionContent,
-                  correctAnswer: question.answer,
-                  isCorrect
-                });
-              }
-            } else {
-              // 直接比较字母
-              isCorrect = userAnswer.toUpperCase() === question.answer.toUpperCase();
-              console.log('字母直接比较:', { userAnswer, correctAnswer: question.answer, isCorrect });
+          // 直接比较字母答案
+          isCorrect = userAnswer.toUpperCase() === correctAnswer.toUpperCase();
+          console.log('字母直接比较:', { userAnswer, correctAnswer, isCorrect });
+          
+          // 如果不匹配且用户答案可能是选项内容
+          if (!isCorrect && question.options && question.options.length > 0) {
+            // 检查用户是否输入了选项内容而不是字母
+            const userOptionIndex = question.options.findIndex((opt: string) => opt === userAnswer);
+            if (userOptionIndex >= 0) {
+              const userLetterFromContent = String.fromCharCode(65 + userOptionIndex);
+              isCorrect = userLetterFromContent.toUpperCase() === correctAnswer.toUpperCase();
+              console.log('用户内容转字母比较:', {
+                userContent: userAnswer,
+                userLetterFromContent,
+                correctAnswer,
+                isCorrect
+              });
             }
-          } else {
-            // 直接比较字符串
-            isCorrect = userAnswer === question.answer;
-            // 如果不匹配，尝试按字母比较
-            if (!isCorrect && question.options && Array.isArray(question.options)) {
-              // 查找与内容匹配的选项索引
-              const contentMatchIndex = question.options.findIndex((opt: string) => opt === userAnswer);
-              if (contentMatchIndex >= 0) {
-                // 将索引转为字母并比较
-                const letterFromContent = String.fromCharCode(65 + contentMatchIndex);
-                isCorrect = letterFromContent === question.answer;
-                console.log('内容转字母比较:', { 
-                  userContent: userAnswer,
-                  letterFromContent,
-                  correctAnswer: question.answer,
-                  isCorrect
-                });
-              }
-            }
-            console.log('内容直接比较:', { userAnswer, correctAnswer: question.answer, isCorrect });
           }
         }
+      } else {
+        // 其他类型的自定义题目
+        isCorrect = userAnswer === correctAnswer;
+        console.log('其他类型直接比较:', { userAnswer, correctAnswer, isCorrect });
       }
     } 
     // 标准题库处理逻辑
     else if (Array.isArray(question.answer)) {
       // 多选题
+      correctAnswer = question.answer;
       if (Array.isArray(userAnswer)) {
         // 排序两个数组，确保顺序不同但内容相同的答案也能被判定为正确
         const sortedCorrectAnswer = [...question.answer].sort();
@@ -144,6 +146,7 @@ export async function POST(request: Request) {
       }
     } else {
       // 单选题、判断题、填空题或编程题
+      correctAnswer = question.answer;
       isCorrect = question.answer === userAnswer;
     }
 
@@ -187,9 +190,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // 最终调试输出
+    console.log('最终结果:', { 
+      isCorrect, 
+      correctAnswer: isCorrect ? null : correctAnswer,
+      explanation: question.explanation || '暂无解析'
+    });
+
     return NextResponse.json({
       isCorrect,
-      correctAnswer: isCorrect ? null : question.answer,
+      correctAnswer: isCorrect ? null : correctAnswer,
       explanation: question.explanation || '暂无解析' // 无论正确与否都返回解释
     });
   } catch (error) {
