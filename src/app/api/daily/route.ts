@@ -43,10 +43,16 @@ export async function GET(request: Request) {
       const newPractice = await Practice.create({
         userId,
         type: 'daily',
-        questions: questions.map(q => q._id),
-        completed: false,
-        score: 0,
-        answers: []
+        title: `每日一练 - ${new Date().toLocaleDateString('zh-CN')}`,
+        questions: questions.map(q => ({
+          questionId: q._id,
+          isCorrect: false
+        })),
+        totalQuestions: questions.length,
+        correctCount: 0,
+        accuracy: 0,
+        timeStarted: new Date(),
+        completed: false
       });
 
       await newPractice.populate('questions');
