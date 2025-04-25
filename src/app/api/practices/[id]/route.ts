@@ -26,6 +26,7 @@ interface PracticeQuestion {
   questionId: string;
   userAnswer?: string;
   isCorrect?: boolean;
+  toObject?: () => any;
 }
 
 interface Question {
