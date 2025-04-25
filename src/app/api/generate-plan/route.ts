@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
+interface Task {
+  id: string;
+  date: string;
+  subject: string;
+  description: string;
+  duration: number;
+  completed: boolean;
+}
+
 // 配置代理（如果需要）
 const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
@@ -82,7 +91,7 @@ export async function POST(req: Request) {
 }
 
 // 使用AI生成计划的函数
-async function generateAIPlan(subjects: string[], startDate: string, endDate: string, dailyHours: number) {
+async function generateAIPlan(subjects: string[], startDate: string, endDate: string, dailyHours: number): Promise<Task[] | null> {
   // 构建提示词
   const prompt = `生成学习计划：科目 ${subjects.join('、')}，从 ${startDate} 到 ${endDate}，每天 ${dailyHours} 小时。`;
 

@@ -22,6 +22,12 @@ const customQuestionSchema = new mongoose.Schema({
 const CustomQuestion = mongoose.models.CustomQuestion || 
   mongoose.model("CustomQuestion", customQuestionSchema);
 
+interface PracticeQuestion {
+  questionId: string;
+  userAnswer?: string;
+  isCorrect?: boolean;
+}
+
 // 获取单个练习记录
 export async function GET(
   request: Request,
@@ -44,7 +50,7 @@ export async function GET(
     }
     
     // Get question details
-    const questionIds = practice.questions.map(q => q.questionId);
+    const questionIds = practice.questions.map((q: PracticeQuestion) => q.questionId);
     
     // 从标准题库获取题目
     const standardQuestions = await Question.find({ 
@@ -64,7 +70,7 @@ export async function GET(
         title: q.subject,
         content: q.content,
         type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'short_answer',
-        options: q.options ? q.options.map((opt, index) => ({
+        options: q.options ? q.options.map((opt: string, index: number) => ({
           label: String.fromCharCode(65 + index), // A, B, C...
           text: opt
         })) : [],
@@ -140,7 +146,7 @@ export async function PUT(
       const { answers } = data;
       
       // 获取所有题目的答案
-      const questionIds = practice.questions.map(q => q.questionId);
+      const questionIds = practice.questions.map((q: PracticeQuestion) => q.questionId);
       
       // 从标准题库获取题目
       const standardQuestions = await Question.find({ 

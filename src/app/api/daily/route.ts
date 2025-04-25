@@ -46,7 +46,7 @@ export async function GET(request: Request) {
           title: q.subject,
           content: q.content,
           type: q.type === 'multiple_choice' ? 'choice' : q.type === 'fill_blank' ? 'fill' : 'code',
-          options: q.options ? q.options.map((opt, index) => ({
+          options: q.options ? q.options.map((opt: string, index: number) => ({
             label: String.fromCharCode(65 + index),
             text: opt
           })) : [],

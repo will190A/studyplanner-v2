@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/db';
 import StudyPlan from '@/models/StudyPlan';
 
+interface Task {
+  id: string;
+  date: string;
+  subject: string;
+  description: string;
+  duration: number;
+  completed: boolean;
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string; taskId: string } }
@@ -19,7 +28,7 @@ export async function PATCH(
       );
     }
 
-    const taskIndex = plan.tasks.findIndex(task => task.id === params.taskId);
+    const taskIndex = plan.tasks.findIndex((task: Task) => task.id === params.taskId);
     if (taskIndex === -1) {
       return NextResponse.json(
         { error: 'Task not found' },

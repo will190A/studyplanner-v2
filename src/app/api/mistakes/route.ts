@@ -79,7 +79,7 @@ export async function GET(request: Request) {
             content: customQuestion.content,
             type: customQuestion.type === 'multiple_choice' ? 'choice' : 
                   customQuestion.type === 'fill_blank' ? 'fill' : 'short_answer',
-            options: customQuestion.options ? customQuestion.options.map((opt, index) => ({
+            options: customQuestion.options ? customQuestion.options.map((opt: string, index: number) => ({
               label: String.fromCharCode(65 + index),
               text: opt
             })) : [],
