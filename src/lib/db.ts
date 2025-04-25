@@ -34,18 +34,18 @@ async function connectDB() {
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+      cached.conn = mongoose;
       return mongoose;
     });
   }
 
   try {
-    cached.conn = await cached.promise;
+    const mongoose = await cached.promise;
+    return mongoose;
   } catch (e) {
     cached.promise = null;
     throw e;
   }
-
-  return cached.conn;
 }
 
 // 导出connectToDatabase作为别名，保持兼容性
