@@ -69,7 +69,11 @@ export default function DailyPracticePage() {
         }
         
         const recordsData = await recordsResponse.json()
-        setCheckInRecords(recordsData.checkInRecords || [])
+        // 确保打卡记录按日期正序排序（从早到晚）
+        const sortedRecords = (recordsData.checkInRecords || []).sort((a, b) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        )
+        setCheckInRecords(sortedRecords)
         
         setLoading(false)
       } catch (error) {
@@ -98,12 +102,23 @@ export default function DailyPracticePage() {
   // 计算连续打卡天数
   const calculateStreak = () => {
     let streak = 0
-    const sortedRecords = [...checkInRecords].sort((a, b) => 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    // 按日期降序排序（为了计算连续天数，仍然需要从最近的开始算）
+    const recordsForStreak = [...checkInRecords].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )
     
-    for (const record of sortedRecords) {
-      if (record.completed) {
+    // 从最近的记录开始检查
+    for (let i = 0; i < recordsForStreak.length; i++) {
+      const record = recordsForStreak[i]
+      const recordDate = new Date(record.date)
+      recordDate.setHours(0, 0, 0, 0)
+      
+      // 如果是今天的记录且练习已完成，或者是之前的记录且已完成
+      if ((recordDate.getTime() === today.getTime() && record.completed) || 
+          (recordDate.getTime() < today.getTime() && record.completed)) {
         streak++
       } else {
         break
