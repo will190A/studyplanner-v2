@@ -77,11 +77,8 @@ export async function GET(
     
     // 合并题目信息
     const questions = [
-      ...standardQuestions.map((q: Question) => ({ 
-        ...(q.toObject ? q.toObject() : q), 
-        isCustom: false 
-      })),
-      ...customQuestions.map((q: Question) => ({
+      ...standardQuestions.map((q: Question) => ({ ...q, isCustom: false })),
+      ...customQuestions.map((q: Question) => ({ 
         _id: q._id,
         answer: q.answer,
         isCustom: true
@@ -168,7 +165,7 @@ export async function PUT(
       
       // 合并题目信息
       const questions = [
-        ...standardQuestions.map((q: Question) => ({ ...q.toObject(), isCustom: false })),
+        ...standardQuestions.map((q: Question) => ({ ...q, isCustom: false })),
         ...customQuestions.map((q: Question) => ({ 
           _id: q._id,
           answer: q.answer,
@@ -209,7 +206,7 @@ export async function PUT(
         });
         
         return {
-          ...practiceQuestion.toObject(),
+          ...practiceQuestion,
           isCorrect,
           userAnswer: answerInfo.answer
         };
