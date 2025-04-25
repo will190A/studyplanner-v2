@@ -96,8 +96,8 @@ export async function GET(
     ];
     
     // Merge question information with practice record
-    const questionsWithDetail = practice.questions.map(practiceQuestion => {
-      const questionDetail = questions.find(q => 
+    const questionsWithDetail = practice.questions.map((practiceQuestion: PracticeQuestion) => {
+      const questionDetail = questions.find(q =>
         q._id.toString() === practiceQuestion.questionId.toString()
       );
       
